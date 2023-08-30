@@ -67,7 +67,8 @@ if __name__ == "__main__":
     try:
         session, token = login(LOGIN_URL, EMAIL, PASSWORD)
         days = {}
-        entries = models.csv_to_entries(os.path.abspath(args.input_file.name), PROJECTS_MAPPING)
+        entries = models.csv_to_toggl_entries(os.path.abspath(args.input_file.name), PROJECTS_MAPPING)
+        models.sanitize_toggl_entries(entries)
         days = models.toggl_entries_to_personio_days(entries)
 
         for date, day in days.items():
