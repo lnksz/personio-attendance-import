@@ -37,8 +37,8 @@ def login(url: str, email: str, password: str) -> list[requests.Session, str]:
     logging.debug(first_response.headers, '\n')
     set_cookie = first_response.headers["set-cookie"]
     token = set_cookie.split()[0].split('=')[1].rstrip(';')
-    logging.info(f'CSRF: {set_cookie}')
-    logging.info(f"CSRF: {token}")
+    logging.debug(f'CSRF: {set_cookie}')
+    logging.debug(f"CSRF: {token}")
 
     return session, token
 
@@ -82,6 +82,7 @@ if __name__ == "__main__":
                     "X-CSRF-Token": token,
                 },
             )
+            logging.debug('reponse:', response)
             resp_dict = json.loads(response.text)
             if response.status_code != 200 or not resp_dict['success']:
                 logging.error(f'FAILED to register attendance on {date}')
