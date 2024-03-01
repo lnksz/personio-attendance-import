@@ -89,7 +89,7 @@ def sanitize_toggl_entries(entries: List[TogglTimeEntry]) -> List[TogglTimeEntry
        Toggl can handle this, but Personio can't."""
     entries.sort(key=lambda x: (x.start_date, x.start_time))
     for prev_entry, entry in zip(entries, entries[1:]):
-        if prev_entry.start_date == entry.start_date and entry.start_time <= prev_entry.end_time:
+        if prev_entry.end_date == entry.start_date and entry.start_time <= prev_entry.end_time:
             entry.start_time, prev_entry.end_time = prev_entry.end_time, entry.start_time
     return entries
 
