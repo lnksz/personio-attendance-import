@@ -18,8 +18,13 @@ Before running the app create on such file.
 ```python
 # Personio credentials
 EMAIL = 'me@corp.org'
-PASSWORD = r'yourpersoniopassword'
+PASSWORD = os.environ['PERSO_PASS']
 PROFILE_ID = 123456  # This can be found in your personio profile URL
+
+# Toggl Configuration
+TOGGL_WORKSPACE = 123123
+TOGGL_EMAIL = 'me@corp.com'
+TOGGL_PASSWORD = os.environ['TOGGL_PASS']
 
 # Personio Configuration
 HOST = "https://gmbh.personio.de"
@@ -49,20 +54,8 @@ python main.py -i Toggl_time_entries.csv
 
 ## Toggl Export (input for this script)
 
-Currently I use Toggl's deatailed report site to download a CSV of the entries. (This could be also automated)
-See the Export at https://track.toggl.com/reports/detailed/{{yourid}}/period/thisWeek
-
-Note:
-
-I add Toggl clients with our internal project IDs and then accociate Toggl projects to these clients.
-Like this the export will contain in the client column the internal project ID which then can be mapped
-to the Personio project ID.
-For example if the company internal project ID is "ABC123", I will create a client in Toggle like
-"ABC123 - Product X development", then associate e.g. a Toggl project "Product X BSP" with the client,
-and book time entries against this project.
-
-This is not needed to create time entries in Personio, because it allows you to not select any project.
-But if you would need it, you can define you mapping in the `config.py` file.
+I use the detailed report from Toggl. First started with the export through the UI,
+then added the automatic download through the API.
 
 ## Personio API
 

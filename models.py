@@ -74,7 +74,7 @@ def csv_to_toggl_entries(csv_file: str, proj_mapping: tuple) -> List[TogglTimeEn
             for idx, row in enumerate(reader):
                 if idx == 0:
                     continue
-                _, _, client, proj, _, desc, _, start_date, start_time, end_date, end_time, _, _, _ = row
+                _, _, client, proj, _, desc, _, start_date, start_time, end_date, end_time, *_ = row
                 entries.append(TogglTimeEntry(
                     proj_mapping, client, proj, desc, start_date, start_time, end_date, end_time))
         except ValueError:
