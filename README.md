@@ -57,6 +57,28 @@ python main.py -i Toggl_time_entries.csv
 I use the detailed report from Toggl. First started with the export through the UI,
 then added the automatic download through the API.
 
+API exploration, documented in [API](https://engineering.toggl.com/docs/api/)
+```
+export TU=MyToggleUser
+export TP=MyTogglePassword
+
+curl  https: //api.track.toggl.com/api/v9/me \
+  -H "Content-Type: application/json" \
+  -u "${TU}:${TP}"
+# Response
+{
+  ...
+  "default_workspace_id": 345345,
+  ...
+}
+
+export WID=345345
+curl -X POST https://api.track.toggl.com/reports/api/v3/workspace/$WID/search/time_entries.csv \
+  -H "Content-Type: application/json" \
+  -d '{"start_date": "2024-04-10", "end_date":"2024-04-11", "grouped":false,"order_by":"date","order_dir":"ASC", "hide_amounts":true}' \
+  -u "${TU}:${TP}"
+```
+
 ## Personio API
 
 This boils down to
