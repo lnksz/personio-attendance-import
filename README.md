@@ -4,7 +4,7 @@ I find Personio's current solutions for attendence recording very limited. (As o
 The app on android isn't stable, and the web app is very limited in functionality. (No start/stop.)
 
 On the other hand there are tools just for this purpose, like Toggl.com. Which do a much better job at this.
-It would be of course nice if Toggle and Personio would integrate out of the box, but currently this isn't the case.
+It would be of course nice if Toggl and Personio would integrate out of the box, but currently this isn't the case.
 
 So here a poor man's solution to import Toggl entries into Personio.
 (But could be useful to anyone, as the main part is the import into Personio, the input could be adapted to other tool exports.)
