@@ -85,7 +85,7 @@ python main.py -h
 
 I use the detailed report from Toggl, which is available both through UI and API.
 
-UI: https://track.toggl.com/reports/detailed/<profile-id>/period/thisWeek
+UI: https://track.toggl.com/reports/detailed/
 
 API exploration, documented in [API](https://engineering.toggl.com/docs/api/)
 
