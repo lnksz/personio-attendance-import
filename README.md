@@ -47,6 +47,9 @@ PROJECTS_MAPPING = group_mapping = (
     )
 ```
 
+If you want to use the wrapper scripts `log-*`, then it is required, that you store your secrets with
+[pass](https://www.passwordstore.org/) "the standard Unix password manager".
+
 # Using the script
 
 You can use a virtual environment to install dependencies and execute in it.
