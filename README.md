@@ -9,7 +9,13 @@ It would be of course nice if Toggl and Personio would integrate out of the box,
 So here a poor man's solution to import Toggl entries into Personio.
 (But could be useful to anyone, as the main part is the import into Personio, the input could be adapted to other tool exports.)
 
-## Configuration
+At the end of the day you can "transfer" your attendence from Toggl to Personio by
+
+```bash
+./log-today.sh
+```
+
+# Configuration
 
 The script expects a `config.py` file next to it, from which it can read out `PROFILE_ID, EMAIL` and other potentially sensitive information.
 
@@ -27,7 +33,7 @@ TOGGL_EMAIL = 'me@corp.com'
 TOGGL_PASSWORD = os.environ['TOGGL_PASS']
 
 # Personio Configuration
-HOST = "https://gmbh.personio.de"
+HOST = "https://corp.personio.de"
 LOGIN_URL = f"{HOST}/login/index"
 ATTENDANCE_URL = f'{HOST}/api/v1/attendances/days'
 PROJECTS_URL = f'{HOST}/api/v1/projects?filter[active]=1'
@@ -41,23 +47,48 @@ PROJECTS_MAPPING = group_mapping = (
     )
 ```
 
-## Using the script
+# Using the script
 
 You can use a virtual environment to install dependencies and execute in it.
+
+For the first time, create a Python virtual environment to install dependencies:
 
 ```python
 python -m venv venv
 . venv/bin/activate
 python -m pip install -r requirements.txt
+```
+
+Then import from a detailed Toggl report (CSV)
+
+```bash
+./log-file.sh Toggl_time_entries.csv
+# or directly
 python main.py -i Toggl_time_entries.csv
 ```
 
-## Toggl Export (input for this script)
+Or log today's enries from Toggl:
 
-I use the detailed report from Toggl. First started with the export through the UI,
-then added the automatic download through the API.
+```bash
+./log-today.sh
+# or directly
+python main.py
+```
+
+for help see
+
+```bash
+python main.py -h
+```
+
+# Input: Toggl Export
+
+I use the detailed report from Toggl, which is available both through UI and API.
+
+UI: https://track.toggl.com/reports/detailed/<profile-id>/period/thisWeek
 
 API exploration, documented in [API](https://engineering.toggl.com/docs/api/)
+
 ```
 export TU=MyToggleUser
 export TP=MyTogglePassword
@@ -79,14 +110,14 @@ curl -X POST https://api.track.toggl.com/reports/api/v3/workspace/$WID/search/ti
   -u "${TU}:${TP}"
 ```
 
-## Personio API
+# Output: Personio API
 
 This boils down to
 - Authentication with a session
 - Parsing out the XSRF token from the response
 - Sending attendance data with UUIDs and right formatting
 
-# API Analysis
+## API Analysis
 
 Captured traffic from the Personio site and real user interaction.
 
@@ -95,7 +126,7 @@ Uppon each entry into a time field, the day data is sent to the server for valid
 
 Interesting is that here already a `uuid` is sent for the day.
 
-## Get list of projects
+### Get list of projects
 
 ```
 GET /api/v1/projects?filter[active]=1 HTTP/2
@@ -138,16 +169,17 @@ Sec-Fetch-Site: same-origin
 }
 ```
 
-Here the project IDs are `numbers`, but in the attendance request, the project id is passed in as a `string`!
+Here the project IDs are `numbers`, but in the attendance request,
+the project id is passed in as a `string`!
 ```json
 "project_id":"79286"
 ```
 
-## Attendance requests
+### Attendance requests
 
 Clicking on the calendar, and in the popup modal during adding start, end etc.
 
-### Validations before submission
+#### Validations before submission
 
 **Request**
 
@@ -213,7 +245,7 @@ with body:
 origiantor for the request was `validate-and-calculate-full-day` from app.js
 
 
-### Submitting the form
+#### Submitting the form
 
 This is done by a `PUT` request where the URL includes the days UUID.
 
@@ -332,4 +364,5 @@ If we send a period which is outside of the day, referenced by the day UUID, the
 BUT one can simpy generate a uuid1 for the day and create it immediately with the periods,
 IF there isn't already a UUID assigned for that day.
 
-**Hot to get the id for the day if there is already on??? Good question!**
+**How to get the id for the day if there is already on??? Good question!**
+
