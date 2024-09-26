@@ -2,3 +2,4 @@ venv
 *.csv
 config.py
 __pycache__
+reports
