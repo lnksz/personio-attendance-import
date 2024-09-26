@@ -87,10 +87,12 @@ python main.py -h
 # Input: Toggl Export
 
 I use the detailed report from Toggl, which is available both through UI and API.
+If the data is exported through the tool and if there is a timer running,
+the running timer will be stopped.
 
 UI: https://track.toggl.com/reports/detailed/
 
-API exploration, documented in [API](https://engineering.toggl.com/docs/api/)
+API exploration, documented in [API](https://engineering.toggl.com/docs/)
 
 ```
 export TU=MyToggleUser
