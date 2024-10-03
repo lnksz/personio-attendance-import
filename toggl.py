@@ -1,10 +1,10 @@
-import logging
+from loguru import logger
 from base64 import b64encode
 import requests
 
 
 def stop_running_timer(auth: bytes, workspace_id: int):
-    logging.debug("Check running timer")
+    logger.debug("Check running timer")
     current = requests.get(
         "https://api.track.toggl.com/api/v9/me/time_entries/current",
         headers={
@@ -13,7 +13,7 @@ def stop_running_timer(auth: bytes, workspace_id: int):
         },
     )
     if current.status_code == 200 and current.json() is None:
-        logging.info("No running timer")
+        logger.info("No running timer")
         return
 
     cid = current.json()["id"]
@@ -25,7 +25,7 @@ def stop_running_timer(auth: bytes, workspace_id: int):
         },
     )
     if stoped.status_code == 200:
-        logging.info("Stopped running timer")
+        logger.info("Stopped running timer")
     else:
         raise RuntimeError("Couldn't stop timer")
 
@@ -40,8 +40,8 @@ def get_detailed_report_csv(
     auth = b64encode(f"{email}:{password}".encode()).decode("ascii")
     stop_running_timer(auth, workspace_id)
 
-    logging.info(f"Query toggl from {start_date} to {end_date}")
-    data = requests.post(
+    logger.info(f"Query toggl from {start_date} to {end_date}")
+    response = requests.post(
         f"https://api.track.toggl.com/reports/api/v3/workspace/{workspace_id}/search/time_entries.csv",
         json={
             "start_date": start_date,
@@ -59,6 +59,6 @@ def get_detailed_report_csv(
 
     out_csv = f"Toggl_time_entries_{start_date}_to_{end_date}.csv"
     with open(out_csv, "w") as f:
-        f.write(data.text)
-        logging.info(f"Saved report to {out_csv}")
+        f.write(response.text)
+        logger.info(f"Saved report to {out_csv}")
     return out_csv

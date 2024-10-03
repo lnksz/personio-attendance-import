@@ -2,6 +2,7 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
+#     "loguru",
 #     "requests",
 # ]
 # ///
@@ -9,7 +10,7 @@
 import datetime
 import json
 import uuid
-import logging
+from loguru import logger
 import argparse
 import os
 
@@ -63,11 +64,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    logging.basicConfig()
-    logging.getLogger().setLevel(logging.INFO)
-    requests_log = logging.getLogger("requests.packages.urllib3")
-    requests_log.setLevel(logging.INFO)
-    requests_log.propagate = True
+    # For debugging requests:
+    # requests_log = logging.getLogger("requests.packages.urllib3")
+    # requests_log.setLevel(logging.DEBUG)
+    # requests_log.propagate = True
 
     report = args.input_file
     if not report:
@@ -85,43 +85,45 @@ if __name__ == "__main__":
         days = models.toggl_entries_to_personio_days(entries)
 
         for date, day in days.items():
-            logging.info(f"Registering entries from {date}")
+            attendance = day.to_personio_attendance(PROFILE_ID)
+            logger.info(f"Registering entries ({len(attendance["periods"])}) from {date}")
 
             response = session.put(
                 f"{ATTENDANCE_URL}/{uuid.uuid1()}",
-                json=day.to_personio_attendance(PROFILE_ID),
+                json=attendance,
                 headers={
                     "X-XSRF-TOKEN": token,
                     "X-CSRF-Token": token,
                 },
             )
-            logging.info(
+            logger.info(
                 f"response: {response.status_code} "
                 f'{response.headers["content-type"]}'
             )
-            logging.debug(f"reponse content:\n {response.text}")
+            logger.trace(f"reponse content:\n {response.text}")
 
             if (
                 response.status_code != 200
                 or response.headers["content-type"] != "application/json"
             ):
-                logging.debug(
+                logger.error(
                     f"Attendance Req:\n"
-                    f"{response.request.headers}\n"
-                    f"{response.request.body}"
+                    f"Heads: {response.request.headers}\n"
+                    f"Request: {response.request.body}"
                 )
-                logging.error(f"FAILED to register attendance for {date}")
+                logger.error(f"FAILED to register attendance for {date}")
+
                 continue
             resp_dict = json.loads(response.text)
             if response.status_code != 200 or not resp_dict["success"]:
-                logging.debug(
+                logger.error(
                     f"Attendance Req:\n"
                     f"{response.request.headers}\n"
                     f"{response.request.body}"
                 )
-                logging.info(f"Attendance Resp:\n{response.text}")
-                logging.error(f"FAILED to register attendance for {date}")
+                logger.info(f"Attendance Resp:\n{response.text}")
+                logger.error(f"FAILED to register attendance for {date}")
     except Exception as e:
-        logging.exception("FAILED", exc_info=e)
+        logger.exception("FAILED", exc_info=e)
     finally:
         session.close()
