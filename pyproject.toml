@@ -1,0 +1,13 @@
+[project]
+name = "personio-attandence-import"
+version = "0.1.0"
+description = "Log time entries in Personio, from a toggl report"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "loguru",
+    "requests"
+]
+
+[tool.ruff]
+line-length = 100

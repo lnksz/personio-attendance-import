@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "loguru",
-#     "requests",
-# ]
-# ///
-
 import datetime
 import json
 import uuid
@@ -64,11 +55,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # For debugging requests:
-    # requests_log = logging.getLogger("requests.packages.urllib3")
-    # requests_log.setLevel(logging.DEBUG)
-    # requests_log.propagate = True
-
     report = args.input_file
     if not report:
         report = toggl.get_detailed_report_csv(
@@ -88,7 +74,7 @@ if __name__ == "__main__":
             attendance = day.to_personio_attendance(PROFILE_ID)
             logger.info(f"Registering entries ({len(attendance["periods"])}) from {date}")
 
-            response = session.put(
+            resp = session.put(
                 f"{ATTENDANCE_URL}/{uuid.uuid1()}",
                 json=attendance,
                 headers={
@@ -96,32 +82,25 @@ if __name__ == "__main__":
                     "X-CSRF-Token": token,
                 },
             )
-            logger.info(
-                f"response: {response.status_code} "
-                f'{response.headers["content-type"]}'
-            )
-            logger.trace(f"reponse content:\n {response.text}")
+            logger.info(f"response: {resp.status_code} " f'{resp.headers["content-type"]}')
+            logger.trace(f"reponse content:\n {resp.text}")
 
             if (
-                response.status_code != 200
-                or response.headers["content-type"] != "application/json"
+                resp.status_code != 200
+                or resp.headers["content-type"] != "application/json"
             ):
                 logger.error(
                     f"Attendance Req:\n"
-                    f"Heads: {response.request.headers}\n"
-                    f"Request: {response.request.body}"
+                    f"Heads: {resp.request.headers}\n"
+                    f"Request: {resp.request.body}"
                 )
                 logger.error(f"FAILED to register attendance for {date}")
 
                 continue
-            resp_dict = json.loads(response.text)
-            if response.status_code != 200 or not resp_dict["success"]:
-                logger.error(
-                    f"Attendance Req:\n"
-                    f"{response.request.headers}\n"
-                    f"{response.request.body}"
-                )
-                logger.info(f"Attendance Resp:\n{response.text}")
+            resp_dict = json.loads(resp.text)
+            if resp.status_code != 200 or not resp_dict["success"]:
+                logger.error(f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}")
+                logger.info(f"Attendance Resp:\n{resp.text}")
                 logger.error(f"FAILED to register attendance for {date}")
     except Exception as e:
         logger.exception("FAILED", exc_info=e)

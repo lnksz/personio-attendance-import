@@ -5,7 +5,17 @@ import io
 
 
 class TogglTimeEntry:
-    def __init__(self, project_mapping: tuple, client: str, project: str, desc: str, start_date: str, start_time: str, end_date: str, end_time: str):
+    def __init__(
+        self,
+        project_mapping: tuple,
+        client: str,
+        project: str,
+        desc: str,
+        start_date: str,
+        start_time: str,
+        end_date: str,
+        end_time: str,
+    ):
         self.client = client
         self.project = project
         self.desc = desc
@@ -16,7 +26,7 @@ class TogglTimeEntry:
         self.project_mapping = project_mapping
 
     def __str__(self):
-        return f'Client: {self.client}\nProj: {self.project}\nDesc: {self.desc}\n{self.start_date}T{self.start_time} - {self.end_date}T{self.end_time}\n'
+        return f"Client: {self.client}\nProj: {self.project}\nDesc: {self.desc}\n{self.start_date}T{self.start_time} - {self.end_date}T{self.end_time}\n"
 
     def __repr__(self):
         return self.__str__()
@@ -34,11 +44,11 @@ class TogglTimeEntry:
             "project_id": self.proj_toggl2personio(self.client),
             "period_type": "work",
             "legacy_break_min": 0,
-            "comment": f'[{self.project}]',
+            "comment": f"[{self.project}]",
             # Could be a config whether or not to include all details
             # "comment": f'[{self.project}] {self.desc}',
-            "start": f'{self.start_date}T{self.start_time}Z',
-            "end": f'{self.end_date}T{self.end_time}Z',
+            "start": f"{self.start_date}T{self.start_time}Z",
+            "end": f"{self.end_date}T{self.end_time}Z",
         }
 
 
@@ -49,7 +59,7 @@ class PersonioDay:
         self.uuid = str(uuid.uuid1())
 
     def __str__(self):
-        return f'{self.date} - {len(self.periods)}'
+        return f"{self.date} - {len(self.periods)}"
 
     def __repr__(self):
         return self.__str__()
@@ -65,22 +75,49 @@ class PersonioDay:
 
 
 def csv_to_toggl_entries(csv_file: str, proj_mapping: tuple) -> List[TogglTimeEntry]:
-    # 0    1     2      3       4    5           6        7          8          9        10       11       12   13
-    # User,Email,Client,Project,Task,Description,Billable,Start date,Start time,End date,End time,Duration,Tags,Amount ()
+    # 0     1      2       3        4     5            6
+    # User, Email, Client, Project, Task, Description, Billable,
+    # 7           8           9         10        11        12    13
+    # Start date, Start time, End date, End time, Duration, Tags, Amount ()
     entries = []
-    with io.open(csv_file, 'r', encoding='utf-8') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',', quotechar='"', doublequote=True, lineterminator='\n')
+    with io.open(csv_file, "r", encoding="utf-8") as csvfile:
+        reader = csv.reader(
+            csvfile, delimiter=",", quotechar='"', doublequote=True, lineterminator="\n"
+        )
         try:
             next(reader)  # skip header
             for row in reader:
-                _, _, client, proj, _, desc, _, start_date, start_time,end_date, end_time, duration, *_ = row
-                if duration.startswith('00:00:'):
+                (
+                    _,
+                    _,
+                    client,
+                    proj,
+                    _,
+                    desc,
+                    _,
+                    start_date,
+                    start_time,
+                    end_date,
+                    end_time,
+                    duration,
+                    *_,
+                ) = row
+                if duration.startswith("00:00:"):
                     # Skip super short entries with less than 1m duration
                     # Personio doesn't like this
-                    logger.debug(f'Skipping entry {desc} ({duration})')
                     continue
-                entries.append(TogglTimeEntry(
-                    proj_mapping, client, proj, desc, start_date, start_time, end_date, end_time))
+                entries.append(
+                    TogglTimeEntry(
+                        proj_mapping,
+                        client,
+                        proj,
+                        desc,
+                        start_date,
+                        start_time,
+                        end_date,
+                        end_time,
+                    )
+                )
         except ValueError:
             print(f"Error parsing entry {row}")
     return entries
@@ -88,13 +125,16 @@ def csv_to_toggl_entries(csv_file: str, proj_mapping: tuple) -> List[TogglTimeEn
 
 def sanitize_toggl_entries(entries: List[TogglTimeEntry]) -> List[TogglTimeEntry]:
     """With Toggl, it's possible to have overlapping entries.
-       I think because of the different control sources (web, desktop, mobile)...
-       There are entries which start before the previous one ends.
-       Toggl can handle this, but Personio can't."""
+    I think because of the different control sources (web, desktop, mobile)...
+    There are entries which start before the previous one ends.
+    Toggl can handle this, but Personio can't."""
     entries.sort(key=lambda x: (x.start_date, x.start_time))
     for prev_entry, entry in zip(entries, entries[1:]):
         if prev_entry.end_date == entry.start_date and entry.start_time <= prev_entry.end_time:
-            entry.start_time, prev_entry.end_time = prev_entry.end_time, entry.start_time
+            entry.start_time, prev_entry.end_time = (
+                prev_entry.end_time,
+                entry.start_time,
+            )
     return entries
 
 

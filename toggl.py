@@ -7,10 +7,7 @@ def stop_running_timer(auth: bytes, workspace_id: int):
     logger.debug("Check running timer")
     current = requests.get(
         "https://api.track.toggl.com/api/v9/me/time_entries/current",
-        headers={
-            "content-type": "application/json",
-            "Authorization": f"Basic {auth}"
-        },
+        headers={"content-type": "application/json", "Authorization": f"Basic {auth}"},
     )
     if current.status_code == 200 and current.json() is None:
         logger.info("No running timer")
@@ -18,11 +15,8 @@ def stop_running_timer(auth: bytes, workspace_id: int):
 
     cid = current.json()["id"]
     stoped = requests.patch(
-        f'https://api.track.toggl.com/api/v9/workspaces/{workspace_id}/time_entries/{cid}/stop',
-        headers={
-            'content-type': 'application/json',
-            'Authorization': f"Basic {auth}"
-        },
+        f"https://api.track.toggl.com/api/v9/workspaces/{workspace_id}/time_entries/{cid}/stop",
+        headers={"content-type": "application/json", "Authorization": f"Basic {auth}"},
     )
     if stoped.status_code == 200:
         logger.info("Stopped running timer")
@@ -58,14 +52,12 @@ def get_detailed_report_csv(
     )
     if response.status_code != 200:
         logger.error(
-            f"Toggl export:\n"
-            f"Request: {response.request.body}\n"
-            f"Response: {response.text}"
+            f"Toggl export:\n" f"Request: {response.request.body}\n" f"Response: {response.text}"
         )
         raise RuntimeError("Toggl export failed")
 
     out_csv = f"Toggl_time_entries_{start_date}_to_{end_date}.csv"
-    with open(out_csv, "w", encoding='utf-8') as f:
+    with open(out_csv, "w", encoding="utf-8") as f:
         f.write(response.text)
         logger.info(f"Saved report to {out_csv}")
     return out_csv
