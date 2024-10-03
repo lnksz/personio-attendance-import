@@ -71,14 +71,18 @@ def csv_to_toggl_entries(csv_file: str, proj_mapping: tuple) -> List[TogglTimeEn
     with io.open(csv_file, 'r', encoding='utf-8') as csvfile:
         reader = csv.reader(csvfile, delimiter=',', quotechar='"', doublequote=True, lineterminator='\n')
         try:
-            for idx, row in enumerate(reader):
-                if idx == 0:
+            next(reader)  # skip header
+            for row in reader:
+                _, _, client, proj, _, desc, _, start_date, start_time,end_date, end_time, duration, *_ = row
+                if duration.startswith('00:00:'):
+                    # Skip super short entries with less than 1m duration
+                    # Personio doesn't like this
+                    logger.debug(f'Skipping entry {desc} ({duration})')
                     continue
-                _, _, client, proj, _, desc, _, start_date, start_time, end_date, end_time, *_ = row
                 entries.append(TogglTimeEntry(
                     proj_mapping, client, proj, desc, start_date, start_time, end_date, end_time))
         except ValueError:
-            print(f'Error parsing row {idx} len({len(row)}): {row}')
+            print(f"Error parsing entry {row}")
     return entries
 
 
