@@ -68,7 +68,7 @@ def csv_to_toggl_entries(csv_file: str, proj_mapping: tuple) -> List[TogglTimeEn
     # 0    1     2      3       4    5           6        7          8          9        10       11       12   13
     # User,Email,Client,Project,Task,Description,Billable,Start date,Start time,End date,End time,Duration,Tags,Amount ()
     entries = []
-    with io.open(csv_file, 'r', encoding='utf-8-sig') as csvfile:
+    with io.open(csv_file, 'r', encoding='utf-8') as csvfile:
         reader = csv.reader(csvfile, delimiter=',', quotechar='"', doublequote=True, lineterminator='\n')
         try:
             for idx, row in enumerate(reader):

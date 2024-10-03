@@ -65,7 +65,7 @@ def get_detailed_report_csv(
         raise RuntimeError("Toggl export failed")
 
     out_csv = f"Toggl_time_entries_{start_date}_to_{end_date}.csv"
-    with open(out_csv, "w") as f:
+    with open(out_csv, "w", encoding='utf-8') as f:
         f.write(response.text)
         logger.info(f"Saved report to {out_csv}")
     return out_csv
