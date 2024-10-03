@@ -56,6 +56,13 @@ def get_detailed_report_csv(
             "Authorization": f"Basic {auth}",
         },
     )
+    if response.status_code != 200:
+        logger.error(
+            f"Toggl export:\n"
+            f"Request: {response.request.body}\n"
+            f"Response: {response.text}"
+        )
+        raise RuntimeError("Toggl export failed")
 
     out_csv = f"Toggl_time_entries_{start_date}_to_{end_date}.csv"
     with open(out_csv, "w") as f:
