@@ -10,25 +10,10 @@ import models
 import personio
 import toggl
 
-try:
-    from config import (
-        ATTENDANCE_URL,
-        LOGIN_URL,
-        EMAIL,
-        PASSWORD,
-        PROFILE_ID,
-        PROJECTS_MAPPING,
-        TOGGL_WORKSPACE,
-        TOGGL_EMAIL,
-        TOGGL_PASSWORD,
-    )
-except ImportError:
-    print("WARNING: no config.py found. Please create one!")
-    exit(1)
-
 
 if __name__ == "__main__":
     today = datetime.datetime.now().date()
+    tomorrow = today + datetime.timedelta(days=1)
     parser = argparse.ArgumentParser(
         prog="Personio Attendance Importer",
         description="Import attendance entries from services like Toggl",
@@ -40,26 +25,47 @@ if __name__ == "__main__":
         type=argparse.FileType("r"),
         dest="input_file",
         default=None,
+        help="Input CSV containing the attendance entries (default: None)",
     )
     parser.add_argument(
         "-s",
         "--start-date",
         dest="start_date",
         default=str(today),
+        help=f"Start date for the report (default: {today})",
     )
     parser.add_argument(
         "-e",
         "--end-date",
         dest="end_date",
-        default=str(today + datetime.timedelta(days=1)),
+        default=str(tomorrow),
+        help=f"Start date for the report (default: {tomorrow})",
     )
     args = parser.parse_args()
+
+    try:
+        from config import (
+            ATTENDANCE_URL,
+            LOGIN_URL,
+            EMAIL,
+            PASSWORD,
+            PROFILE_ID,
+            PROJECTS_MAPPING,
+            TOGGL_WORKSPACE,
+            TOGGL_EMAIL,
+            TOGGL_PASSWORD,
+        )
+    except ImportError:
+        print("WARNING: no config.py found. Please create one!")
+        exit(1)
 
     report = args.input_file
     if not report:
         report = toggl.get_detailed_report_csv(
             args.start_date, args.end_date, TOGGL_EMAIL, TOGGL_PASSWORD, TOGGL_WORKSPACE
         )
+        worked = toggl.get_work_duration(TOGGL_EMAIL, TOGGL_PASSWORD, args.start_date)
+        logger.info(f"Worked hours: {worked / 3600.0:.2f}")
     else:
         report = report.name
 
@@ -72,7 +78,9 @@ if __name__ == "__main__":
 
         for date, day in days.items():
             attendance = day.to_personio_attendance(PROFILE_ID)
-            logger.info(f"Registering entries ({len(attendance["periods"])}) from {date}")
+            logger.info(
+                f"Registering entries ({len(attendance["periods"])}) from {date}"
+            )
 
             resp = session.put(
                 f"{ATTENDANCE_URL}/{uuid.uuid1()}",
@@ -82,7 +90,9 @@ if __name__ == "__main__":
                     "X-CSRF-Token": token,
                 },
             )
-            logger.info(f"response: {resp.status_code} " f'{resp.headers["content-type"]}')
+            logger.info(
+                f"response: {resp.status_code} " f'{resp.headers["content-type"]}'
+            )
             logger.trace(f"reponse content:\n {resp.text}")
 
             if (
@@ -99,7 +109,9 @@ if __name__ == "__main__":
                 continue
             resp_dict = json.loads(resp.text)
             if resp.status_code != 200 or not resp_dict["success"]:
-                logger.error(f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}")
+                logger.error(
+                    f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}"
+                )
                 logger.info(f"Attendance Resp:\n{resp.text}")
                 logger.error(f"FAILED to register attendance for {date}")
     except Exception as e:
