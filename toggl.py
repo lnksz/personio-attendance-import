@@ -1,6 +1,35 @@
 from loguru import logger
 from base64 import b64encode
 import requests
+from datetime import datetime
+
+
+def get_duration(entry: dict) -> int:
+    if entry["stop"] is not None:
+        return entry["duration"]
+    start = datetime.fromisoformat(entry["start"])
+    now = datetime.now()
+    return int(now.timestamp() - start.timestamp())
+
+
+def get_work_duration(
+    email: str,
+    password: str,
+    since_date: str = None,
+) -> int:
+    auth = b64encode(f"{email}:{password}".encode()).decode("ascii")
+    if since_date is not None:
+        since = int(datetime.fromisoformat(since_date).timestamp())
+    else:
+        since = int(datetime.combine(datetime.now().date(), datetime.min.time()).timestamp())
+    today = requests.get(
+        f"https://api.track.toggl.com/api/v9/me/time_entries?since={since}",
+        headers={"content-type": "application/json", "Authorization": f"Basic {auth}"},
+    )
+    if today.status_code != 200:
+        raise RuntimeError("Couldn't get today's entries")
+
+    return sum([get_duration(entry) for entry in today.json()])
 
 
 def stop_running_timer(auth: bytes, workspace_id: int):
@@ -52,7 +81,9 @@ def get_detailed_report_csv(
     )
     if response.status_code != 200:
         logger.error(
-            f"Toggl export:\n" f"Request: {response.request.body}\n" f"Response: {response.text}"
+            f"Toggl export:\n"
+            f"Request: {response.request.body}\n"
+            f"Response: {response.text}"
         )
         raise RuntimeError("Toggl export failed")
 
