@@ -69,6 +69,7 @@ if __name__ == "__main__":
     else:
         report = report.name
 
+    session = None
     try:
         session, token = personio.login(LOGIN_URL, EMAIL, PASSWORD)
         days = {}
@@ -117,4 +118,5 @@ if __name__ == "__main__":
     except Exception as e:
         logger.exception("FAILED", exc_info=e)
     finally:
-        session.close()
+        if session:
+            session.close()
