@@ -39,7 +39,7 @@ if __name__ == "__main__":
         "--end-date",
         dest="end_date",
         default=str(tomorrow),
-        help=f"Start date for the report (default: {tomorrow})",
+        help=f"The first date since start-date to NOT include in the report (default: {tomorrow})",
     )
     args = parser.parse_args()
 
