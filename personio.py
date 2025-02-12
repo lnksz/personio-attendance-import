@@ -26,6 +26,7 @@ def login(url: str, email: str, password: str) -> tuple[requests.Session, str]:
         logger.error("Login failed: 'set-cookie' header not found")
         raise requests.exceptions.RequestException("Login failed: 'set-cookie' header not found")
     token = set_cookie.split()[0].split("=")[1].rstrip(";")
+    logger.info("Login successful!")
     logger.trace(f"CSRF: {set_cookie}")
     logger.trace(f"CSRF: {token}")
 

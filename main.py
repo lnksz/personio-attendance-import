@@ -103,7 +103,8 @@ if __name__ == "__main__":
                 logger.error(
                     f"Attendance Req:\n"
                     f"Heads: {resp.request.headers}\n"
-                    f"Request: {resp.request.body}"
+                    f"Request: {resp.request.body}\n"
+                    f"Response: {resp.text}"
                 )
                 logger.error(f"FAILED to register attendance for {date}")
 
