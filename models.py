@@ -47,8 +47,8 @@ class TogglTimeEntry:
             "comment": f"[{self.project}]",
             # Could be a config whether or not to include all details
             # "comment": f'[{self.project}] {self.desc}',
-            "start": f"{self.start_date}T{self.start_time}Z",
-            "end": f"{self.end_date}T{self.end_time}Z",
+            "start": f"{self.start_date}T{self.start_time}",
+            "end": f"{self.end_date}T{self.end_time}",
         }
 
 

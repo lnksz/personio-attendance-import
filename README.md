@@ -35,7 +35,7 @@ TOGGL_PASSWORD = os.environ['TOGGL_PASS']
 # Personio Configuration
 HOST = "https://corp.personio.de"
 LOGIN_URL = f"{HOST}/login/index"
-ATTENDANCE_URL = f'{HOST}/api/v1/attendances/days'
+ATTENDANCE_URL = f"{HOST}/svc/attendance-api/v1/days"
 PROJECTS_URL = f'{HOST}/api/v1/projects?filter[active]=1'
 
 # Project Mapping (define as an empty tuple if not used)
@@ -190,9 +190,7 @@ Clicking on the calendar, and in the popup modal during adding start, end etc.
 
 (not all Headers included)
 ```
-POST https://gmbh.personio.de/api/v1/attendances/employees/1234567/validate-and-calculate-full-day
-
-POST /api/v1/attendances/employees/1234567/validate-and-calculate-full-day HTTP/2
+POST /svc/attendance-api/validate-and-calculate-full-day?propose-fix=false HTTP/2
 Host: gmbh.personio.de
 User-Agent: Mozilla/5.0
 Accept: application/json, text/plain, */*
@@ -215,19 +213,24 @@ with body:
 
 ```json
 {
-    "attendance_day_id": "02218ad5-c89f-497e-b377-b561873eca93",
+    "attendance_day_id": "9b52c9d9-2405-4d3f-b61f-876d3c528b3f",
+    "employee_id": 1234567,
     "periods": [
         {
-            "attendance_period_id": "95fd3082-5aec-4d36-8db6-458086c84555",
-            "start": "2023-03-03 00:00:00",
-            "end": "2023-03-03 00:30:00",
-            "period_type": "work"
+            "attendance_period_id": "5a0462cc-b273-4b15-a472-5b5f7926f45d",
+            "end": "2025-02-12 08:30:00",
+            "period_type": "work",
+            "start": "2025-02-12 12:00:00",
+            "comment": null,
+            "project_id": null
         },
         {
-            "attendance_period_id": "e86a4664-f242-4a08-9584-b9893f4da318",
-            "start": "2023-03-03 00:15:00",
-            "end": "2023-03-03 00:20:00",
-            "period_type": "break"
+            "attendance_period_id": "7607a368-8b0e-4918-9f78-cae122c0852c",
+            "end": "2025-02-12 18:00:00",
+            "period_type": "work",
+            "start": "2025-02-12 13:00:00",
+            "comment": null,
+            "project_id": 123456
         }
     ]
 }
@@ -264,7 +267,7 @@ Notes:
 **Request**
 
 ```
-PUT /api/v1/attendances/days/02218ad5-c89f-497e-b377-b561873eca93 HTTP/2
+PUT /svc/attendance-api/v1/days/9b52c9d9-2405-4d3f-b61f-876d3c528b3f HTTP/2
 Host: gmbh.personio.de
 User-Agent: Mozilla/5.0
 Accept: application/json, text/plain, */*
@@ -291,24 +294,23 @@ Body:
     "employee_id": 1234567,
     "periods": [
         {
-            "id": "95fd3082-5aec-4d36-8db6-458086c84555",
-            "project_id": "79281",
-            "period_type": "work",
-            "legacy_break_min": 0,
+            "id": "5a0462cc-b273-4b15-a472-5b5f7926f45d",
             "comment": null,
-            "start": "2023-03-03T00:00:00Z",
-            "end": "2023-03-03T00:30:00Z"
+            "period_type": "work",
+            "project_id": null,
+            "start": "2025-02-12T08:30:00",
+            "end": "2025-02-12T12:00:00"
         },
         {
-            "id": "e86a4664-f242-4a08-9584-b9893f4da318",
-            "project_id": null,
-            "period_type": "break",
-            "legacy_break_min": 0,
+            "id": "7607a368-8b0e-4918-9f78-cae122c0852c",
             "comment": null,
-            "start": "2023-03-03T00:15:00Z",
-            "end": "2023-03-03T00:25:00Z"
+            "period_type": "work",
+            "project_id": 123456,
+            "start": "2025-02-12T13:00:00",
+            "end": "2025-02-12T18:00:00"
         }
-    ]
+    ],
+    "geolocation": null
 }
 ```
 
@@ -316,26 +318,85 @@ Body:
 
 ```json
 {
-    "employee_id": 1234567,
-    "periods": [
+    "success": true,
+    "data": [
         {
-            "id": "95fd3082-5aec-4d36-8db6-458086c84555",
-            "project_id": "79281",
-            "period_type": "work",
-            "legacy_break_min": 0,
-            "comment": null,
-            "start": "2023-03-03T00:00:00Z",
-            "end": "2023-03-03T00:30:00Z"
+            "id": "9b52c9d9-2405-4d3f-b61f-876d3c528b3f",
+            "type": "attendancedays",
+            "attributes": {
+                "employee_id": 1234567,
+                "company_id": 12345,
+                "status": "complete",
+                "day": "2025-02-12",
+                "break_min": 60,
+                "duration": ,
+                "count_periods": 4,
+                "rejection_reason": null,
+                "rules_violation_reason": null,
+                "created_at": "2025-02-12 18:01:00",
+                "updated_at": "2025-02-12 18:01:00"
+            },
+            "relationships": {
+                "periods": {
+                    "data": [
+                        {
+                            "type": "attendanceperiods",
+                            "id": "5a0462cc-b273-4b15-a472-5b5f7926f45d"
+                        },
+                        {
+                            "type": "attendanceperiods",
+                            "id": "7607a368-8b0e-4918-9f78-cae122c0852c"
+                        },
+                        {
+                            "type": "attendanceperiods",
+                            "id": "d62279ed-76d0-4b78-b295-1fc28f965384"
+                        },
+                        {
+                            "type": "attendanceperiods",
+                            "id": "9f4ffd48-7f16-47aa-bd34-f623b3766cac"
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "included": [
+        {
+            "type": "attendanceperiods",
+            "id": "5a0462cc-b273-4b15-a472-5b5f7926f45d",
+            "attributes": {
+                "legacy_id": null,
+                "legacy_status": "pending",
+                "start": "2025-02-12T08:38:00.000Z",
+                "end": "2025-02-12T08:58:00.000Z",
+                "period_type": "work",
+                "comment": null,
+                "legacy_break_min": 0,
+                "origin": "web",
+                "project_id": null,
+                "created_at": "2025-02-12 17:29:34",
+                "updated_at": "2025-02-12 17:29:34"
+            }
         },
         {
-            "id": "e86a4664-f242-4a08-9584-b9893f4da318",
-            "project_id": null,
-            "period_type": "break",
-            "legacy_break_min": 0,
-            "comment": null,
-            "start": "2023-03-03T00:15:00Z",
-            "end": "2023-03-03T00:25:00Z"
-        }
+            "type": "attendanceperiods",
+            "id": "7607a368-8b0e-4918-9f78-cae122c0852c",
+            "attributes": {
+                "legacy_id": null,
+                "legacy_status": "pending",
+                "start": "2025-02-12T09:00:00.000Z",
+                "end": "2025-02-12T12:00:00.000Z",
+                "period_type": "work",
+                "comment": null,
+                "legacy_break_min": 0,
+                "origin": "web",
+                "project_id": 536429,
+                "created_at": "2025-02-12 17:29:34",
+                "updated_at": "2025-02-12 17:29:34"
+            }
+        },
+        {},
+        {}
     ]
 }
 ```
