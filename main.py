@@ -91,20 +91,21 @@ if __name__ == "__main__":
                     "X-CSRF-Token": token,
                 },
             )
+            content_type = resp.headers.get("content-type", "")
             logger.info(
-                f"response: {resp.status_code} " f'{resp.headers["content-type"]}'
+                f"response: {resp.status_code} " f'{content_type}'
             )
             logger.trace(f"reponse content:\n {resp.text}")
 
             if (
                 resp.status_code != 200
-                or resp.headers["content-type"] != "application/json"
+                or content_type != "application/json"
             ):
                 logger.error(
                     f"Attendance Req:\n"
                     f"Heads: {resp.request.headers}\n"
                     f"Request: {resp.request.body}\n"
-                    f"Response: {resp.text}"
+                    f"Response: {resp}\n{resp.text}\n"
                 )
                 logger.error(f"FAILED to register attendance for {date}")
 
