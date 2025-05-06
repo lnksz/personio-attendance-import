@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     session = None
     try:
-        session, token = personio.login(LOGIN_URL, EMAIL, PASSWORD)
+        session, t1, t2, t3 = personio.login(LOGIN_URL, EMAIL, PASSWORD)
         days = {}
         entries = models.csv_to_toggl_entries(os.path.abspath(report), PROJECTS_MAPPING)
         models.sanitize_toggl_entries(entries)
@@ -87,8 +87,12 @@ if __name__ == "__main__":
                 f"{ATTENDANCE_URL}/{uuid.uuid1()}",
                 json=attendance,
                 headers={
-                    "X-XSRF-TOKEN": token,
-                    "X-CSRF-Token": token,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "XSRF-TOKEN": t1,
+                    "X-XSRF-TOKEN": t2,
+                    "X-CSRF-Token": t2,
+                    "X-ATHENA-XSRF-TOKEN": t3,
                 },
             )
             content_type = resp.headers.get("content-type", "")

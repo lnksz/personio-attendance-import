@@ -1,36 +1,48 @@
 import requests
 from loguru import logger
+from config import HOST
 
 
-def login(url: str, email: str, password: str) -> tuple[requests.Session, str]:
+def login(url: str, email: str, password: str) -> tuple[requests.Session, str, str, str]:
     logger.info("Login")
     session = requests.Session()
-    first_response = session.post(
+    login = session.post(
         url,
         headers={
             "Content-Type": "application/x-www-form-urlencoded",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0",
-            "Origin": "https://efr-gmbh.personio.de",
+            "Origin": HOST,
         },
         data={"email": email, "password": password},
     )
 
-    logger.trace(f"Headers: {str(first_response.headers)}\nResponse:{first_response.text[:256]}\n")
-    if first_response.status_code != 200:
-        logger.error(f"Login failed: {first_response.status_code} {first_response.text}")
+    logger.trace(f"Headers: {str(login.headers)}")
+    logger.trace(f"Cookies: {login.cookies}")
+    logger.trace(f"Response: {login.text[:256]}\n")
+
+    if login.status_code != 200:
+        logger.error(f"Login failed: {login.status_code} {login.text}")
         raise requests.exceptions.HTTPError("Login failed")
 
-    set_cookie = first_response.headers.get("set-cookie")
-    if not set_cookie:
-        logger.error("Login failed: 'set-cookie' header not found")
-        raise requests.exceptions.RequestException("Login failed: 'set-cookie' header not found")
-    token = set_cookie.split()[0].split("=")[1].rstrip(";")
-    logger.info("Login successful!")
-    logger.trace(f"CSRF: {set_cookie}")
-    logger.trace(f"CSRF: {token}")
+    token1 = login.cookies.get("XSRF-TOKEN")
+    if not token1:
+        logger.error("Login failed: 'XSRF-TOKEN' cookie not found")
+        raise requests.exceptions.RequestException("Login failed: 'XSRF-TOKEN' cookie not found")
 
-    return session, token
+    token2 = login.cookies.get("personio_session")
+    if not token2:
+        logger.error("Login failed: 'personio_session' cookie not found")
+        raise requests.exceptions.RequestException("Login failed: 'personio_session' cookie not found")
+
+    token3 = login.cookies.get("ATHENA-XSRF-TOKEN")
+    if not token3:
+        logger.error("Login failed: 'ATHENA-XSRF-TOKEN' cookie not found")
+        raise requests.exceptions.RequestException("Login failed: 'ATHENA-XSRF-TOKEN' cookie not found")
+
+    logger.info("Login successful!")
+
+    return session, token1, token2, token3
 
 
 def get_projects(session: requests.Session, projects_url: str) -> requests.Response:

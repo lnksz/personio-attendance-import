@@ -274,13 +274,15 @@ Accept: application/json, text/plain, */*
 Accept-Language: en-US,en;q=0.5
 Accept-Encoding: gzip, deflate, br
 Content-Type: application/json
-X-CSRF-Token: TOKEN1
-X-XSRF-TOKEN: TOKEN1
+XSRF-TOKEN=TOKEN1
+X-CSRF-Token: TOKEN2
+X-XSRF-TOKEN: TOKEN2
+X-ATHENA-XSRF-TOKEN: TOKEN3
+Cookie: personio_browser_id=id1; ATHENA-XSRF-TOKEN=TOKEN3; personio_session=TOKEN2; ATHENA_SESSION=session2; XSRF-TOKEN=TOKEN1
 Content-Length: 401
 Origin: https://gmbh.personio.de
 Connection: keep-alive
 Referer: https://gmbh.personio.de/attendance/employee/1234567/2023-03
-XSRF-TOKEN=TOKEN1
 Sec-Fetch-Dest: empty
 Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
