@@ -6,7 +6,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "loguru",
-    "requests"
+    "playwright>=1.52.0",
+    "requests",
 ]
 
 [tool.ruff]

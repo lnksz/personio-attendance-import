@@ -1,48 +1,58 @@
 import requests
 from loguru import logger
-from config import HOST
+from playwright.sync_api import sync_playwright
 
 
-def login(url: str, email: str, password: str) -> tuple[requests.Session, str, str, str]:
-    logger.info("Login")
-    session = requests.Session()
-    login = session.post(
-        url,
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0",
-            "Origin": HOST,
-        },
-        data={"email": email, "password": password},
-    )
+def login(
+    user: str,
+    password: str,
+    url: str = "https://login.personio.com/u/login/identifier",
+    company_hash: str = ""
+) -> dict[str, str]:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
 
-    logger.trace(f"Headers: {str(login.headers)}")
-    logger.trace(f"Cookies: {login.cookies}")
-    logger.trace(f"Response: {login.text[:256]}\n")
+        logger.info("🌐 Navigating to login.personio.com...")
+        page.goto(
+            f"{url}?state={company_hash}",
+            wait_until="networkidle",
+        )
 
-    if login.status_code != 200:
-        logger.error(f"Login failed: {login.status_code} {login.text}")
-        raise requests.exceptions.HTTPError("Login failed")
+        try:
+            logger.info("⌛ Waiting for email input...")
+            page.wait_for_selector('input[name="username"]', timeout=10000)
+        except TimeoutError:
+            logger.error("❌ Email field not found. Taking screenshot.")
+            page.screenshot(path="error_screenshot.png")
+            browser.close()
+            return {}
 
-    token1 = login.cookies.get("XSRF-TOKEN")
-    if not token1:
-        logger.error("Login failed: 'XSRF-TOKEN' cookie not found")
-        raise requests.exceptions.RequestException("Login failed: 'XSRF-TOKEN' cookie not found")
+        logger.info("📧 Entering email...")
+        page.fill('input[name="username"]', user)
+        page.click('button[type="submit"]')
 
-    token2 = login.cookies.get("personio_session")
-    if not token2:
-        logger.error("Login failed: 'personio_session' cookie not found")
-        raise requests.exceptions.RequestException("Login failed: 'personio_session' cookie not found")
+        try:
+            logger.info("⌛ Waiting for password field...")
+            page.wait_for_selector('input[name="password"]', timeout=10000)
+        except TimeoutError:
+            logger.error("❌ Password field not found. Taking screenshot.")
+            page.screenshot(path="error_password.png")
+            browser.close()
+            return {}
 
-    token3 = login.cookies.get("ATHENA-XSRF-TOKEN")
-    if not token3:
-        logger.error("Login failed: 'ATHENA-XSRF-TOKEN' cookie not found")
-        raise requests.exceptions.RequestException("Login failed: 'ATHENA-XSRF-TOKEN' cookie not found")
+        logger.info("🔑 Entering password...")
+        page.fill('input[name="password"]', password)
+        page.click('button[type="submit"]')
 
-    logger.info("Login successful!")
+        logger.info("⏳ Waiting for post-login page to load...")
+        page.wait_for_load_state("networkidle")
+        logger.success("✅ Login successful. Cookies saved.")
 
-    return session, token1, token2, token3
+        cookies = {cookie["name"]: cookie["value"] for cookie in context.cookies()}
+        browser.close()
+        return cookies
 
 
 def get_projects(session: requests.Session, projects_url: str) -> requests.Response:
@@ -50,3 +60,8 @@ def get_projects(session: requests.Session, projects_url: str) -> requests.Respo
     logger.debug("Projects:")
     logger.trace(f"Headers: {str(response.headers)}\nResponse:{response.text[:256]}\n")
     return response
+
+
+if __name__ == "__main__":
+    from config import EMAIL, PASSWORD, COMPANY_HASH, LOGIN_URL
+    login(user=EMAIL, password=PASSWORD, url=LOGIN_URL, company_hash=COMPANY_HASH)

@@ -33,10 +33,11 @@ TOGGL_EMAIL = 'me@corp.com'
 TOGGL_PASSWORD = os.environ['TOGGL_PASS']
 
 # Personio Configuration
-HOST = "https://corp.personio.de"
-LOGIN_URL = f"{HOST}/login/index"
+HOST = "https://efr-gmbh.app.personio.com"
 ATTENDANCE_URL = f"{HOST}/svc/attendance-api/v1/days"
 PROJECTS_URL = f'{HOST}/api/v1/projects?filter[active]=1'
+LOGIN_URL = "https://login.personio.com/u/login/identifier"
+COMPANY_HASH = "longhash after email prompt, see 'state' in URL"
 
 # Project Mapping (define as an empty tuple if not used)
 # You can query the project list using PROJECTS_URL
@@ -52,22 +53,12 @@ If you want to use the wrapper scripts `log-*`, then it is required, that you st
 
 # Using the script
 
-You can use a virtual environment to install dependencies and execute in it.
-
-For the first time, create a Python virtual environment to install dependencies:
-
-```python
-python -m venv venv
-. venv/bin/activate
-python -m pip install -r requirements.txt
-```
+Use `uv` to run the script.
 
 Then import from a detailed Toggl report (CSV)
 
 ```bash
 ./log-file.sh Toggl_time_entries.csv
-# or directly
-python main.py -i Toggl_time_entries.csv
 ```
 
 Or log today's enries from Toggl:
@@ -75,13 +66,13 @@ Or log today's enries from Toggl:
 ```bash
 ./log-today.sh
 # or directly
-python main.py
+uv run main.py
 ```
 
 for help see
 
 ```bash
-python main.py -h
+uv run main.py -h
 ```
 
 # Input: Toggl Export
@@ -118,9 +109,8 @@ curl -X POST https://api.track.toggl.com/reports/api/v3/workspace/$WID/search/ti
 # Output: Personio API
 
 This boils down to
-- Authentication with a session
-- Parsing out the XSRF token from the response
-- Sending attendance data with UUIDs and right formatting
+- Authentication via the login page
+- Sending attendance data with UUIDs and right formatting and tokens
 
 ## API Analysis
 
@@ -130,6 +120,11 @@ Uppon each entry into a time field, the day data is sent to the server for valid
 `api/v1/attendances/employees/{{employee-id}}/validate-and-calculate-full-day`
 
 Interesting is that here already a `uuid` is sent for the day.
+
+### Login
+
+After chasing personio's login via API calls for a while, I resorted to logging
+in via the GUI through playwright. The API alone was way too brittle.
 
 ### Get list of projects
 

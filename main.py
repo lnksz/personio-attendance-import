@@ -1,6 +1,7 @@
 import datetime
 import json
 import uuid
+import requests
 from loguru import logger
 import argparse
 import os
@@ -46,6 +47,7 @@ if __name__ == "__main__":
     try:
         from config import (
             ATTENDANCE_URL,
+            COMPANY_HASH,
             LOGIN_URL,
             EMAIL,
             PASSWORD,
@@ -71,11 +73,16 @@ if __name__ == "__main__":
 
     session = None
     try:
-        session, t1, t2, t3 = personio.login(LOGIN_URL, EMAIL, PASSWORD)
         days = {}
         entries = models.csv_to_toggl_entries(os.path.abspath(report), PROJECTS_MAPPING)
         models.sanitize_toggl_entries(entries)
         days = models.toggl_entries_to_personio_days(entries)
+
+        pers_cookies = personio.login(
+            user=EMAIL, password=PASSWORD, url=LOGIN_URL, company_hash=COMPANY_HASH
+        )
+        session = requests.Session()
+        session.cookies.update(pers_cookies)
 
         for date, day in days.items():
             attendance = day.to_personio_attendance(PROFILE_ID)
@@ -87,24 +94,20 @@ if __name__ == "__main__":
                 f"{ATTENDANCE_URL}/{uuid.uuid1()}",
                 json=attendance,
                 headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "XSRF-TOKEN": t1,
-                    "X-XSRF-TOKEN": t2,
-                    "X-CSRF-Token": t2,
-                    "X-ATHENA-XSRF-TOKEN": t3,
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept": "application/json, text/plain, */*",
+                    "Accept-Encoding": "gzip, deflate, br, zstd",
+                    "Referer": "https://efr-gmbh.app.personio.com/",
+                    "X-ATHENA-XSRF-TOKEN": pers_cookies.get("ATHENA-XSRF-TOKEN", ""),
+                    "X-XSRF-TOKEN": pers_cookies.get("XSRF-TOKEN", ""),
+                    "X-CSRF-Token": pers_cookies.get("XSRF-TOKEN", ""),
                 },
             )
             content_type = resp.headers.get("content-type", "")
-            logger.info(
-                f"response: {resp.status_code} " f'{content_type}'
-            )
+            logger.info(f"response: {resp.status_code} " f"{content_type}")
             logger.trace(f"reponse content:\n {resp.text}")
 
-            if (
-                resp.status_code != 200
-                or content_type != "application/json"
-            ):
+            if resp.status_code != 200 or content_type != "application/json":
                 logger.error(
                     f"Attendance Req:\n"
                     f"Heads: {resp.request.headers}\n"
