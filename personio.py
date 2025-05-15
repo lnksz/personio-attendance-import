@@ -47,7 +47,13 @@ def login(
         page.click('button[type="submit"]')
 
         logger.info("⏳ Waiting for post-login page to load...")
-        page.wait_for_load_state("networkidle")
+        try:
+            page.wait_for_load_state("networkidle")
+        except TimeoutError:
+            logger.error("❌ Post-login page did not load in time. Taking screenshot.")
+            page.screenshot(path="error_postlogin.png")
+            browser.close()
+            return {}
         logger.success("✅ Login successful. Cookies saved.")
 
         cookies = {cookie["name"]: cookie["value"] for cookie in context.cookies()}
