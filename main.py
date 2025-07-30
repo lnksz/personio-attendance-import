@@ -42,6 +42,13 @@ if __name__ == "__main__":
         default=str(tomorrow),
         help=f"The last date since start-date to INCLUDE in the report (default: {tomorrow})",
     )
+    parser.add_argument(
+        "-c",
+        "--continue",
+        dest="continue_running",
+        action="store_true",
+        help="If set, do not stop the running time entry",
+    )
     args = parser.parse_args()
 
     try:
@@ -64,7 +71,12 @@ if __name__ == "__main__":
     report = args.input_file
     if not report:
         report = toggl.get_detailed_report_csv(
-            args.start_date, args.end_date, TOGGL_EMAIL, TOGGL_PASSWORD, TOGGL_WORKSPACE
+            args.start_date,
+            args.end_date,
+            TOGGL_EMAIL,
+            TOGGL_PASSWORD,
+            TOGGL_WORKSPACE,
+            args.continue_running,
         )
         worked = toggl.get_work_duration(TOGGL_EMAIL, TOGGL_PASSWORD, args.start_date)
         logger.info(f"Worked hours: {worked / 3600.0:.2f}")
@@ -86,9 +98,7 @@ if __name__ == "__main__":
 
         for date, day in days.items():
             attendance = day.to_personio_attendance(PROFILE_ID)
-            logger.info(
-                f"Registering entries ({len(attendance["periods"])}) from {date}"
-            )
+            logger.info(f"Registering entries ({len(attendance['periods'])}) from {date}")
 
             resp = session.put(
                 f"{ATTENDANCE_URL}/{uuid.uuid1()}",
@@ -104,7 +114,7 @@ if __name__ == "__main__":
                 },
             )
             content_type = resp.headers.get("content-type", "")
-            logger.info(f"response: {resp.status_code} " f"{content_type}")
+            logger.info(f"response: {resp.status_code} {content_type}")
             logger.trace(f"reponse content:\n {resp.text}")
 
             if resp.status_code != 200 or content_type != "application/json":

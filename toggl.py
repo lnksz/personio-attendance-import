@@ -59,9 +59,11 @@ def get_detailed_report_csv(
     email: str,
     password: str,
     workspace_id: int,
+    continue_running: bool = False,
 ) -> str:
     auth = b64encode(f"{email}:{password}".encode()).decode("ascii")
-    stop_running_timer(auth, workspace_id)
+    if not continue_running:
+        stop_running_timer(auth.encode(), workspace_id)
 
     logger.info(f"Query toggl from {start_date} to {end_date}")
     response = requests.post(
