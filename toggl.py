@@ -32,7 +32,7 @@ def get_work_duration(
     return sum([get_duration(entry) for entry in today.json()])
 
 
-def stop_running_timer(auth: bytes, workspace_id: int):
+def stop_running_timer(auth: str, workspace_id: int):
     logger.debug("Check running timer")
     current = requests.get(
         "https://api.track.toggl.com/api/v9/me/time_entries/current",
@@ -63,7 +63,7 @@ def get_detailed_report_csv(
 ) -> str:
     auth = b64encode(f"{email}:{password}".encode()).decode("ascii")
     if not continue_running:
-        stop_running_timer(auth.encode(), workspace_id)
+        stop_running_timer(auth, workspace_id)
 
     logger.info(f"Query toggl from {start_date} to {end_date}")
     response = requests.post(
