@@ -38,11 +38,23 @@ def stop_running_timer(auth: str, workspace_id: int):
         "https://api.track.toggl.com/api/v9/me/time_entries/current",
         headers={"content-type": "application/json", "Authorization": f"Basic {auth}"},
     )
-    if current.status_code == 200 and current.json() is None:
+
+    if current.status_code != 200:
+        logger.error(f"Failed to fetch current timer: {current.status_code} {current.text}")
+        logger.debug(f"Request headers: {current.request.headers}")
+        raise RuntimeError("Couldn't fetch current timer")
+
+    try:
+        current_data = current.json()
+    except requests.exceptions.JSONDecodeError as e:
+        logger.error(f"Invalid JSON response: {e.msg}. Response content: {current.text}")
+        raise RuntimeError("Invalid JSON response from Toggl API")
+
+    if current_data is None:
         logger.info("No running timer")
         return
 
-    cid = current.json()["id"]
+    cid = current_data["id"]
     stoped = requests.patch(
         f"https://api.track.toggl.com/api/v9/workspaces/{workspace_id}/time_entries/{cid}/stop",
         headers={"content-type": "application/json", "Authorization": f"Basic {auth}"},
@@ -50,6 +62,7 @@ def stop_running_timer(auth: str, workspace_id: int):
     if stoped.status_code == 200:
         logger.info("Stopped running timer")
     else:
+        logger.error(f"Failed to stop timer: {stoped.status_code} {stoped.text}")
         raise RuntimeError("Couldn't stop timer")
 
 
@@ -67,7 +80,8 @@ def get_detailed_report_csv(
 
     logger.info(f"Query toggl from {start_date} to {end_date}")
     response = requests.post(
-        f"https://api.track.toggl.com/reports/api/v3/workspace/{workspace_id}/search/time_entries.csv",
+        f"https://api.track.toggl.com/reports/api/v3/workspace/{workspace_id}/search/"
+        "time_entries.csv",
         json={
             "start_date": start_date,
             "end_date": end_date,
