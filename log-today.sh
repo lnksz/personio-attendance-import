@@ -7,4 +7,9 @@ export LOGURU_LEVEL='INFO'
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd $SCRIPTDIR
 
-uv run ./main.py
+if [ "$#" -eq 0 ]; then
+  TODAY="$(date +%F)"
+  uv run ./main.py -s "$TODAY" -e "$TODAY"
+else
+  uv run ./main.py "$@"
+fi
