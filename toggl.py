@@ -15,21 +15,28 @@ def get_duration(entry: dict) -> int:
 def get_work_duration(
     email: str,
     password: str,
-    since_date: str = None,
+    since_date: str | None = None,
 ) -> int:
+    """Return total worked seconds since `since_date`.
+
+    This is computed by summing all returned time entries for the user.
+    """
+
     auth = b64encode(f"{email}:{password}".encode()).decode("ascii")
     if since_date is not None:
         since = int(datetime.fromisoformat(since_date).timestamp())
     else:
         since = int(datetime.combine(datetime.now().date(), datetime.min.time()).timestamp())
-    today = requests.get(
+
+    resp = requests.get(
         f"https://api.track.toggl.com/api/v9/me/time_entries?since={since}",
         headers={"content-type": "application/json", "Authorization": f"Basic {auth}"},
     )
-    if today.status_code != 200:
-        raise RuntimeError("Couldn't get today's entries")
+    if resp.status_code != 200:
+        raise RuntimeError("Couldn't get time entries")
 
-    return sum([get_duration(entry) for entry in today.json()])
+    entries = resp.json() or []
+    return sum(get_duration(entry) for entry in entries)
 
 
 def stop_running_timer(auth: str, workspace_id: int):
