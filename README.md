@@ -48,6 +48,12 @@ PROJECTS_MAPPING = group_mapping = (
     )
 ```
 
+Due to personio's "fantastic" login, playwright is needed.
+To bootstrap playwright through uv:
+```
+uv run playwright install chromium-headless-shell
+```
+
 If you want to use the wrapper scripts `log-*`, then it is required, that you store your secrets with
 [pass](https://www.passwordstore.org/) "the standard Unix password manager".
 
