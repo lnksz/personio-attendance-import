@@ -7,25 +7,34 @@ def login(
     user: str,
     password: str,
     url: str = "https://login.personio.com/u/login/identifier",
-    company_hash: str = ""
+    company_hash: str = "",
 ) -> dict[str, str]:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
 
+        def snapshot_on_timeout(label: str) -> None:
+            path = f"error_{label}.png"
+            logger.error(f"❌ Timeout reached. Taking screenshot: {path}")
+            page.screenshot(path=path, full_page=True)
+
         logger.info("🌐 Navigating to login.personio.com...")
-        page.goto(
-            f"{url}?state={company_hash}",
-            wait_until="networkidle",
-        )
+        try:
+            page.goto(
+                f"{url}?state={company_hash}",
+                wait_until="networkidle",
+            )
+        except TimeoutError:
+            snapshot_on_timeout("goto")
+            browser.close()
+            return {}
 
         try:
             logger.info("⌛ Waiting for email input...")
             page.wait_for_selector('input[name="username"]', timeout=10000)
         except TimeoutError:
-            logger.error("❌ Email field not found. Taking screenshot.")
-            page.screenshot(path="error_screenshot.png")
+            snapshot_on_timeout("email_field")
             browser.close()
             return {}
 
@@ -37,8 +46,7 @@ def login(
             logger.info("⌛ Waiting for password field...")
             page.wait_for_selector('input[name="password"]', timeout=10000)
         except TimeoutError:
-            logger.error("❌ Password field not found. Taking screenshot.")
-            page.screenshot(path="error_password.png")
+            snapshot_on_timeout("password_field")
             browser.close()
             return {}
 
@@ -48,10 +56,9 @@ def login(
 
         logger.info("⏳ Waiting for post-login page to load...")
         try:
-            page.wait_for_load_state("networkidle")
+            page.wait_for_load_state("networkidle", timeout=5000)
         except TimeoutError:
-            logger.error("❌ Post-login page did not load in time. Taking screenshot.")
-            page.screenshot(path="error_postlogin.png")
+            snapshot_on_timeout("postlogin")
             browser.close()
             return {}
         logger.success("✅ Login successful. Cookies saved.")
@@ -70,4 +77,5 @@ def get_projects(session: requests.Session, projects_url: str) -> requests.Respo
 
 if __name__ == "__main__":
     from config import EMAIL, PASSWORD, COMPANY_HASH, LOGIN_URL
+
     login(user=EMAIL, password=PASSWORD, url=LOGIN_URL, company_hash=COMPANY_HASH)

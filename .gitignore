@@ -4,4 +4,5 @@ config.py
 __pycache__
 reports
 uv.lock
-*.png # Screenshot exports from playwright
+# Screenshot exports from playwright
+*.png

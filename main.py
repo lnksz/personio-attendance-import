@@ -84,6 +84,7 @@ if __name__ == "__main__":
         report = report.name
 
     session = None
+    failed = False
     try:
         days = {}
         entries = models.csv_to_toggl_entries(os.path.abspath(report), PROJECTS_MAPPING)
@@ -93,6 +94,11 @@ if __name__ == "__main__":
         pers_cookies = personio.login(
             user=EMAIL, password=PASSWORD, url=LOGIN_URL, company_hash=COMPANY_HASH
         )
+        if not pers_cookies:
+            logger.error("Login failed, no cookies returned.")
+            failed = True
+            raise RuntimeError("Login failed")
+
         session = requests.Session()
         session.cookies.update(pers_cookies)
 
@@ -126,16 +132,19 @@ if __name__ == "__main__":
                 )
                 logger.error(f"FAILED to register attendance for {date}")
 
+                failed = True
                 continue
             resp_dict = json.loads(resp.text)
             if resp.status_code != 200 or not resp_dict["success"]:
-                logger.error(
-                    f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}"
-                )
+                logger.error(f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}")
                 logger.info(f"Attendance Resp:\n{resp.text}")
                 logger.error(f"FAILED to register attendance for {date}")
+                failed = True
     except Exception as e:
         logger.exception("FAILED", exc_info=e)
+        failed = True
     finally:
         if session:
             session.close()
+    if failed:
+        exit(1)
