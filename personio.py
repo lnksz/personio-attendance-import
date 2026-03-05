@@ -1,6 +1,6 @@
 import requests
 from loguru import logger
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError
 
 
 def login(
