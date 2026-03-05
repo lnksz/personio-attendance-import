@@ -115,8 +115,6 @@ if __name__ == "__main__":
                     "Accept-Encoding": "gzip, deflate, br, zstd",
                     "Referer": "https://efr-gmbh.app.personio.com/",
                     "X-ATHENA-XSRF-TOKEN": pers_cookies.get("ATHENA-XSRF-TOKEN", ""),
-                    "X-XSRF-TOKEN": pers_cookies.get("XSRF-TOKEN", ""),
-                    "X-CSRF-Token": pers_cookies.get("XSRF-TOKEN", ""),
                 },
             )
             content_type = resp.headers.get("content-type", "")

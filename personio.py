@@ -1,3 +1,4 @@
+import time
 import requests
 from loguru import logger
 from playwright.sync_api import sync_playwright, TimeoutError
@@ -54,16 +55,27 @@ def login(
         page.fill('input[name="password"]', password)
         page.click('button[type="submit"]')
 
-        logger.info("⏳ Waiting for post-login page to load...")
-        try:
-            page.wait_for_load_state("networkidle", timeout=5000)
-        except TimeoutError:
-            snapshot_on_timeout("postlogin")
+        logger.info("⏳ Waiting for auth cookies...")
+        required_cookies = {"ATHENA-XSRF-TOKEN"}
+        cookies = {}
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            cookies = {
+                name: value
+                for cookie in context.cookies()
+                if (name := cookie.get("name")) and (value := cookie.get("value"))
+            }
+            if required_cookies.issubset(cookies.keys()):
+                break
+            time.sleep(0.2)
+
+        if not required_cookies.issubset(cookies.keys()):
+            logger.error(f"❌ Required cookies not found. Present: {sorted(cookies.keys())}")
+            snapshot_on_timeout("postlogin_tokens")
             browser.close()
             return {}
-        logger.success("✅ Login successful. Cookies saved.")
 
-        cookies = {cookie["name"]: cookie["value"] for cookie in context.cookies()}
+        logger.success("✅ Login successful. Cookies saved.")
         browser.close()
         return cookies
 
