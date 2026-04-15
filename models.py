@@ -33,7 +33,7 @@ class TogglTimeEntry:
 
     def proj_toggl2personio(self):
         """Converts Toggl client name which has the internal project ID, to Personio project ID"""
-        for pers_id, internal_id in self.project_mapping:
+        for pers_id, internal_id, _ in self.project_mapping:
             if internal_id in self.client or internal_id in self.project:
                 return pers_id
         return None
