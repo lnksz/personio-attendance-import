@@ -31,17 +31,17 @@ class TogglTimeEntry:
     def __repr__(self):
         return self.__str__()
 
-    def proj_toggl2personio(self, client: str):
+    def proj_toggl2personio(self):
         """Converts Toggl client name which has the internal project ID, to Personio project ID"""
         for pers_id, internal_id in self.project_mapping:
-            if internal_id in client:
+            if internal_id in self.client or internal_id in self.project:
                 return pers_id
         return None
 
     def to_personio_period(self):
         return {
             "id": str(uuid.uuid1()),
-            "project_id": self.proj_toggl2personio(self.client),
+            "project_id": self.proj_toggl2personio(),
             "period_type": "work",
             "legacy_break_min": 0,
             "comment": f"[{self.project}]",
