@@ -78,8 +78,6 @@ if __name__ == "__main__":
             TOGGL_WORKSPACE,
             args.continue_running,
         )
-        worked = toggl.get_work_duration(TOGGL_EMAIL, TOGGL_PASSWORD, args.start_date)
-        logger.info(f"Worked hours: {worked / 3600.0:.2f}")
     else:
         report = report.name
 
@@ -88,6 +86,8 @@ if __name__ == "__main__":
     try:
         days = {}
         entries = models.csv_to_toggl_entries(os.path.abspath(report), PROJECTS_MAPPING)
+        worked_seconds = models.worked_duration(entries)
+        logger.info(f"Worked: {worked_seconds // 3600:02d}:{worked_seconds % 3600 // 60:02d}")
         models.sanitize_toggl_entries(entries)
         days = models.toggl_entries_to_personio_days(entries)
 

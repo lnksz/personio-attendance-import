@@ -123,6 +123,23 @@ def csv_to_toggl_entries(csv_file: str, proj_mapping: tuple) -> List[TogglTimeEn
     return entries
 
 
+def worked_duration(
+    entries: List[TogglTimeEntry],
+) -> int:
+    total_seconds = 0
+
+    def time_to_seconds(time_str: str) -> int:
+        hours, minutes, seconds = (int(part) for part in time_str.split(":"))
+        return hours * 3600 + minutes * 60 + seconds
+
+    for entry in entries:
+        start_seconds = time_to_seconds(entry.start_time)
+        end_seconds = time_to_seconds(entry.end_time)
+        total_seconds += end_seconds - start_seconds
+
+    return total_seconds
+
+
 def sanitize_toggl_entries(entries: List[TogglTimeEntry]) -> List[TogglTimeEntry]:
     """With Toggl, it's possible to have overlapping entries.
     I think because of the different control sources (web, desktop, mobile)...
