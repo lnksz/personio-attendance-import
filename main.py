@@ -7,7 +7,6 @@ import argparse
 import os
 
 # Own modules
-import models
 import personio
 import toggl
 
@@ -85,11 +84,11 @@ if __name__ == "__main__":
     failed = False
     try:
         days = {}
-        entries = models.csv_to_toggl_entries(os.path.abspath(report), PROJECTS_MAPPING)
-        worked_seconds = models.worked_duration(entries)
+        entries = toggl.csv_to_toggl_entries(os.path.abspath(report), PROJECTS_MAPPING)
+        worked_seconds = toggl.worked_duration(entries)
         logger.info(f"Worked: {worked_seconds // 3600:02d}:{worked_seconds % 3600 // 60:02d}")
-        models.sanitize_toggl_entries(entries)
-        days = models.toggl_entries_to_personio_days(entries)
+        toggl.sanitize_toggl_entries(entries)
+        days = toggl.toggl_entries_to_personio_days(entries)
 
         pers_cookies = personio.login(
             user=EMAIL, password=PASSWORD, url=LOGIN_URL, company_hash=COMPANY_HASH

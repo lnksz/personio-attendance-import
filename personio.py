@@ -1,7 +1,30 @@
 import time
 import requests
+import uuid
 from loguru import logger
 from playwright.sync_api import sync_playwright, TimeoutError
+
+
+class PersonioDay:
+    def __init__(self, date: str):
+        self.date = date
+        self.periods = []
+        self.uuid = str(uuid.uuid1())
+
+    def __str__(self):
+        return f"{self.date} - {len(self.periods)}"
+
+    def __repr__(self):
+        return self.__str__()
+
+    def add_period(self, period: dict):
+        self.periods.append(period)
+
+    def to_personio_attendance(self, employee_id: int):
+        return {
+            "employee_id": employee_id,
+            "periods": self.periods,
+        }
 
 
 def login(
