@@ -1,5 +1,6 @@
 import datetime
 import json
+import re
 import uuid
 import requests
 from loguru import logger
@@ -9,6 +10,42 @@ import os
 # Own modules
 import personio
 import toggl
+
+
+def get_untrackable_project_ids(resp: requests.Response) -> list[str]:
+    if resp.status_code != 400:
+        return []
+
+    try:
+        resp_dict = resp.json()
+    except requests.exceptions.JSONDecodeError:
+        return []
+
+    untrackable_projects_title_re = re.compile(
+        r"Projects with ids \[([^\]]+)\] for employee \d+ are not trackable"
+    )
+    for error in resp_dict.get("errors", []):
+        if error.get("type") != "ATTENDANCE_PERIOD_PROJECT_NOT_TRACKABLE":
+            continue
+
+        title = error.get("title", "")
+        match = untrackable_projects_title_re.search(title)
+        if not match:
+            return []
+
+        return [project_id.strip() for project_id in match.group(1).split(",") if project_id.strip()]
+
+    return []
+
+
+def remove_untrackable_project_ids(attendance: dict, project_ids: list[str]) -> int:
+    untrackable_ids = set(project_ids)
+    removed = 0
+    for period in attendance["periods"]:
+        if period.get("project_id") in untrackable_ids:
+            period["project_id"] = None
+            removed += 1
+    return removed
 
 
 if __name__ == "__main__":
@@ -105,38 +142,50 @@ if __name__ == "__main__":
             attendance = day.to_personio_attendance(PROFILE_ID)
             logger.info(f"Registering entries ({len(attendance['periods'])}) from {date}")
 
-            resp = session.put(
-                f"{ATTENDANCE_URL}/{uuid.uuid1()}",
-                json=attendance,
-                headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Accept": "application/json, text/plain, */*",
-                    "Accept-Encoding": "gzip, deflate, br, zstd",
-                    "Referer": "https://efr-gmbh.app.personio.com/",
-                    "X-ATHENA-XSRF-TOKEN": pers_cookies.get("ATHENA-XSRF-TOKEN", ""),
-                },
-            )
-            content_type = resp.headers.get("content-type", "")
-            logger.info(f"response: {resp.status_code} {content_type}")
-            logger.trace(f"reponse content:\n {resp.text}")
-
-            if resp.status_code != 200 or content_type != "application/json":
-                logger.error(
-                    f"Attendance Req:\n"
-                    f"Heads: {resp.request.headers}\n"
-                    f"Request: {resp.request.body}\n"
-                    f"Response: {resp}\n{resp.text}\n"
+            while True:
+                resp = session.put(
+                    f"{ATTENDANCE_URL}/{uuid.uuid1()}",
+                    json=attendance,
+                    headers={
+                        "User-Agent": "Mozilla/5.0",
+                        "Accept": "application/json, text/plain, */*",
+                        "Accept-Encoding": "gzip, deflate, br, zstd",
+                        "Referer": "https://efr-gmbh.app.personio.com/",
+                        "X-ATHENA-XSRF-TOKEN": pers_cookies.get("ATHENA-XSRF-TOKEN", ""),
+                    },
                 )
-                logger.error(f"FAILED to register attendance for {date}")
+                content_type = resp.headers.get("content-type", "")
+                logger.info(f"response: {resp.status_code} {content_type}")
+                logger.trace(f"reponse content:\n {resp.text}")
 
-                failed = True
-                continue
-            resp_dict = json.loads(resp.text)
-            if resp.status_code != 200 or not resp_dict["success"]:
-                logger.error(f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}")
-                logger.info(f"Attendance Resp:\n{resp.text}")
-                logger.error(f"FAILED to register attendance for {date}")
-                failed = True
+                untrackable_project_ids = get_untrackable_project_ids(resp)
+                if untrackable_project_ids:
+                    removed = remove_untrackable_project_ids(attendance, untrackable_project_ids)
+                    if removed:
+                        logger.warning(
+                            f"Personio project ids {untrackable_project_ids} are not trackable for {date}; retrying without project mapping"
+                        )
+                        continue
+
+                if resp.status_code != 200 or "application/json" not in content_type:
+                    logger.error(
+                        f"Attendance Req:\n"
+                        f"Heads: {resp.request.headers}\n"
+                        f"Request: {resp.request.body}\n"
+                        f"Response: {resp}\n{resp.text}\n"
+                    )
+                    logger.error(f"FAILED to register attendance for {date}")
+
+                    failed = True
+                    break
+
+                resp_dict = json.loads(resp.text)
+                if resp.status_code != 200 or not resp_dict["success"]:
+                    logger.error(f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}")
+                    logger.info(f"Attendance Resp:\n{resp.text}")
+                    logger.error(f"FAILED to register attendance for {date}")
+                    failed = True
+                break
     except Exception as e:
         logger.exception("FAILED", exc_info=e)
         failed = True
