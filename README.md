@@ -132,6 +132,26 @@ Interesting is that here already a `uuid` is sent for the day.
 After chasing personio's login via API calls for a while, I resorted to logging
 in via the GUI through playwright. The API alone was way too brittle.
 
+If the automated login flow is blocked by Vercel Security Checkpoint, use a
+manual bootstrap once and reuse the saved session cookies afterwards.
+
+```bash
+PERSONIO_MANUAL_LOGIN=true uv run python personio.py
+```
+
+This opens a real browser window. Complete the login manually. Once the script
+detects the `ATHENA-XSRF-TOKEN` cookie, it saves the session to
+`.personio-session.json`.
+
+After that, normal runs reuse the saved cookies automatically:
+
+```bash
+uv run python main.py
+```
+
+If the session expires, delete `.personio-session.json` and run the manual
+bootstrap again.
+
 ### Get list of projects
 
 ```
@@ -434,4 +454,3 @@ BUT one can simpy generate a uuid1 for the day and create it immediately with th
 *IF* there isn't already a UUID assigned for that day.
 
 **How to get the id for the day if there is already on??? Good question!**
-
