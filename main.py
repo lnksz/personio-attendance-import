@@ -173,6 +173,8 @@ if __name__ == "__main__":
             is_registered = personio.log_toggl_day_in_personio(
                 session, config, day, date, pers_cookies
             )
+
+        personio.approve_zeiterfassung_dashboard(config.HOST, pers_cookies, config.NON_APPROVABLE)
     except Exception as e:
         logger.exception("FAILED", exc_info=e)
         is_registered = False
