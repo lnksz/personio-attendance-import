@@ -324,7 +324,7 @@ def _wait_for_approval_card_removed(page: Page, task_id: str, timeout: int = 500
                 document.querySelectorAll('[data-task-type="attendance-day-approval"]')
             ).some(element => element.getAttribute('data-test-id') === taskId)
             """,
-            task_id,
+            arg=task_id,
             timeout=timeout,
         )
         return True
