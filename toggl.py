@@ -121,11 +121,7 @@ def get_detailed_report_csv(
         },
     )
     if response.status_code != 200:
-        logger.error(
-            f"Toggl export:\n"
-            f"Request: {response.request.body}\n"
-            f"Response: {response.text}"
-        )
+        logger.error(f"Toggl export:\nRequest: {response.request.body}\nResponse: {response.text}")
         raise RuntimeError("Toggl export failed")
 
     out_csv = f"Toggl_time_entries_{start_date}_to_{end_date}.csv"
@@ -208,10 +204,7 @@ def sanitize_toggl_entries(entries: List[TogglTimeEntry]) -> List[TogglTimeEntry
     Toggl can handle this, but Personio can't."""
     entries.sort(key=lambda x: (x.start_date, x.start_time))
     for prev_entry, entry in zip(entries, entries[1:]):
-        if (
-            prev_entry.end_date == entry.start_date
-            and entry.start_time <= prev_entry.end_time
-        ):
+        if prev_entry.end_date == entry.start_date and entry.start_time <= prev_entry.end_time:
             entry.start_time, prev_entry.end_time = (
                 prev_entry.end_time,
                 entry.start_time,

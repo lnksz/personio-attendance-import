@@ -4,8 +4,9 @@ import random
 import time
 import requests
 import uuid
+import re
 from loguru import logger
-from playwright.sync_api import sync_playwright, TimeoutError
+from playwright.sync_api import sync_playwright, TimeoutError, Page
 
 
 class PersonioDay:
@@ -45,7 +46,7 @@ def _cookies_to_map(cookies: list[dict]) -> dict[str, str]:
 def load_session_cookies(path: str = SESSION_FILE) -> dict[str, str]:
     if not os.path.exists(path):
         return {}
-    
+
     if os.stat(path).st_mtime < time.time() - 3600:
         logger.info(f"Session file {path} is older than 1 hour")
         return {}
@@ -124,6 +125,14 @@ def login(
 
     if os.environ.get("PERSONIO_MANUAL_LOGIN", "").lower() == "true":
         return bootstrap_manual_login(url=url, company_hash=company_hash)
+
+    if not user.strip():
+        logger.error("Personio email is empty; configure EMAIL before automated login")
+        return {}
+
+    if not password.strip():
+        logger.error("Personio password is empty; set PERSO_PASS or configure PASSWORD before automated login")
+        return {}
 
     debug_mode = os.environ.get("DEBUG_PERSONIO_LOGIN", "").lower() == "true"
 
@@ -221,8 +230,7 @@ def login(
         try:
             # Check if challenge message appears
             page.wait_for_function(
-                """() => document.body.innerText.includes('We are verifying')""",
-                timeout=5000
+                """() => document.body.innerText.includes('We are verifying')""", timeout=5000
             )
             challenge_detected = True
             logger.info("🔐 Security challenge detected, waiting for completion...")
@@ -230,7 +238,7 @@ def login(
             # Now wait for it to disappear (challenge completing)
             page.wait_for_function(
                 """() => !document.body.innerText.includes('We are verifying')""",
-                timeout=30000  # Give challenge up to 30 seconds
+                timeout=30000,  # Give challenge up to 30 seconds
             )
             logger.info("✓ Security challenge completed")
         except TimeoutError:
@@ -283,7 +291,275 @@ def get_projects(session: requests.Session, projects_url: str) -> requests.Respo
     return response
 
 
-if __name__ == "__main__":
-    from config import EMAIL, PASSWORD, COMPANY_HASH, LOGIN_URL
+def _normalize_blacklist(blacklist: tuple[str, ...] | list[str] | str | None) -> list[str]:
+    if not blacklist:
+        return []
 
-    login(user=EMAIL, password=PASSWORD, url=LOGIN_URL, company_hash=COMPANY_HASH)
+    if isinstance(blacklist, str):
+        blacklist = (blacklist,)
+
+    return [entry.strip().lower() for entry in blacklist if entry.strip()]
+
+
+def _playwright_cookies(host: str, cookies: dict[str, str] | list[dict]) -> list[dict]:
+    if isinstance(cookies, dict):
+        cookie_url = host.rstrip("/") + "/"
+        return [
+            {"name": name, "value": value, "url": cookie_url}
+            for name, value in cookies.items()
+            if value
+        ]
+
+    return cookies
+
+
+def _wait_for_approval_card_removed(page: Page, task_id: str, timeout: int = 5000) -> bool:
+    if not task_id:
+        return False
+
+    try:
+        page.wait_for_function(
+            """
+            taskId => !Array.from(
+                document.querySelectorAll('[data-task-type="attendance-day-approval"]')
+            ).some(element => element.getAttribute('data-test-id') === taskId)
+            """,
+            task_id,
+            timeout=timeout,
+        )
+        return True
+    except TimeoutError:
+        return False
+
+
+def approve_zeiterfassung_requests(
+    page: Page,
+    blacklist: tuple[str, ...] | list[str] | str | None = None,
+) -> None:
+    try:
+        normalized_blacklist = _normalize_blacklist(blacklist)
+        handled_task_ids = set()
+        task_list = page.locator('ul[data-test-id="task-list"]')
+        task_list.wait_for(state="visible", timeout=5000)
+
+        cards = task_list.locator('[data-task-type="attendance-day-approval"]')
+        if cards.count() == 0:
+            return
+
+        while True:
+            current_count = cards.count()
+            if current_count == 0:
+                return
+
+            approved_card = False
+            for index in range(current_count):
+                card = cards.nth(index)
+                name = (card.locator("img").first.get_attribute("alt") or "").strip()
+                task_id = (card.get_attribute("data-test-id") or "").strip()
+                task_key = task_id or f"{index}:{name}"
+                if task_key in handled_task_ids:
+                    continue
+
+                normalized_name = name.lower()
+
+                if any(blocked_name in normalized_name for blocked_name in normalized_blacklist):
+                    logger.info(f"Skipping zeiterfassung approval for blacklisted name: {name}")
+                    handled_task_ids.add(task_key)
+                    continue
+
+                approve_button = card.locator('button[aria-label="Genehmigen"]').first
+                handled_task_ids.add(task_key)
+                try:
+                    card.hover(timeout=5000)
+                    approve_button.click(timeout=5000)
+                except TimeoutError:
+                    logger.warning(
+                        f"Pointer click failed for {name or 'unknown employee'}; trying DOM click"
+                    )
+                    try:
+                        approve_button.evaluate("button => button.click()", timeout=5000)
+                    except TimeoutError as exc:
+                        if _wait_for_approval_card_removed(page, task_id):
+                            logger.info(
+                                f"Approved zeiterfassung request for {name or 'unknown employee'}"
+                            )
+                            approved_card = True
+                            break
+
+                        logger.warning(
+                            f"Failed to approve zeiterfassung request for "
+                            f"{name or 'unknown employee'}: {exc}"
+                        )
+                        continue
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to approve zeiterfassung request for "
+                        f"{name or 'unknown employee'}: {exc}"
+                    )
+                    continue
+
+                logger.info(f"Approved zeiterfassung request for {name or 'unknown employee'}")
+                if task_id and not _wait_for_approval_card_removed(page, task_id):
+                    logger.warning(
+                        f"Approved zeiterfassung request for {name or 'unknown employee'}, "
+                        "but the task card did not disappear within 5s; not retrying"
+                    )
+                approved_card = True
+                break
+
+            if not approved_card:
+                return
+
+    except Exception as exc:
+        logger.warning(f"Failed to auto-approve zeiterfassung requests: {exc}")
+
+
+def approve_zeiterfassung_dashboard(
+    host: str,
+    cookies: dict[str, str] | list[dict],
+    blacklist: tuple[str, ...] | list[str] | str | None = None,
+) -> None:
+    try:
+        cookies_for_browser = _playwright_cookies(host, cookies)
+        if not cookies_for_browser:
+            logger.warning("No Personio auth cookies available for approval")
+            return
+
+        debug_mode = os.environ.get("DEBUG_PERSONIO_LOGIN", "").lower() == "true"
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=not debug_mode,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--no-default-browser-check",
+                    "--no-first-run",
+                    "--disable-gpu",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                ],
+            )
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0",
+                locale="en-US",
+                timezone_id="UTC",
+                viewport={"width": 1280, "height": 720},
+            )
+            try:
+                context.add_cookies(cookies_for_browser)
+                page = context.new_page()
+                page.goto(host, wait_until="domcontentloaded")
+                approve_zeiterfassung_requests(page, blacklist)
+            finally:
+                browser.close()
+    except Exception as exc:
+        logger.warning(f"Failed to open Personio dashboard for approval: {exc}")
+
+
+def get_untrackable_project_ids(resp: requests.Response) -> list[str]:
+    if resp.status_code != 400:
+        return []
+
+    try:
+        resp_dict = resp.json()
+    except requests.exceptions.JSONDecodeError:
+        return []
+
+    untrackable_projects_title_re = re.compile(
+        r"Projects with ids \[([^\]]+)\] for employee \d+ are not trackable"
+    )
+    for error in resp_dict.get("errors", []):
+        if error.get("type") != "ATTENDANCE_PERIOD_PROJECT_NOT_TRACKABLE":
+            continue
+
+        title = error.get("title", "")
+        match = untrackable_projects_title_re.search(title)
+        if not match:
+            return []
+
+        return [
+            project_id.strip() for project_id in match.group(1).split(",") if project_id.strip()
+        ]
+
+    return []
+
+
+def remove_untrackable_project_ids(attendance: dict, project_ids: list[str]) -> int:
+    untrackable_ids = set(project_ids)
+    removed = 0
+    for period in attendance["periods"]:
+        if period.get("project_id") in untrackable_ids:
+            period["project_id"] = None
+            removed += 1
+    return removed
+
+
+def log_toggl_day_in_personio(
+    session: requests.Session,
+    config,
+    day: PersonioDay,
+    date: str,
+    cookies: dict[str, str],
+) -> bool:
+    attendance = day.to_personio_attendance(config.PROFILE_ID)
+    logger.info(f"Registering entries ({len(attendance['periods'])}) from {date}")
+    token = cookies.get("ATHENA-XSRF-TOKEN", "")
+
+    while True:
+        resp = session.put(
+            f"{config.ATTENDANCE_URL}/{uuid.uuid1()}",
+            json=attendance,
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Encoding": "gzip, deflate, br, zstd",
+                "Referer": "https://efr-gmbh.app.personio.com/",
+                "X-ATHENA-XSRF-TOKEN": token,
+            },
+        )
+        content_type = resp.headers.get("content-type", "")
+        logger.info(f"response: {resp.status_code} {content_type}")
+        logger.trace(f"reponse content:\n {resp.text}")
+
+        untrackable_project_ids = get_untrackable_project_ids(resp)
+        if untrackable_project_ids:
+            removed = remove_untrackable_project_ids(attendance, untrackable_project_ids)
+            if removed:
+                logger.warning(
+                    f"Personio project ids {untrackable_project_ids} are not trackable for {date}; retrying without project mapping"
+                )
+                continue
+
+        if resp.status_code != 200 or "application/json" not in content_type:
+            logger.error(
+                f"Attendance Req:\n"
+                f"Heads: {resp.request.headers}\n"
+                f"Request: {resp.request.body}\n"
+                f"Response: {resp}\n{resp.text}\n"
+            )
+            logger.error(f"FAILED to register attendance for {date}")
+            return False
+
+        resp_dict = json.loads(resp.text)
+        if resp.status_code != 200 or not resp_dict["success"]:
+            logger.error(f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}")
+            logger.info(f"Attendance Resp:\n{resp.text}")
+            logger.error(f"FAILED to register attendance for {date}")
+            return False
+        return True
+
+
+if __name__ == "__main__":
+    from config import CONFIG
+
+    cookies = login(
+        user=CONFIG.EMAIL,
+        password=CONFIG.PASSWORD,
+        url=CONFIG.LOGIN_URL,
+        company_hash=CONFIG.COMPANY_HASH,
+    )
+    if not cookies:
+        logger.error("Login failed, approval skipped")
+        raise SystemExit(1)
+
+    approve_zeiterfassung_dashboard(CONFIG.HOST, cookies, CONFIG.NON_APPROVABLE)

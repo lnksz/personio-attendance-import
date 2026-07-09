@@ -1,3 +1,4 @@
+from personio import PersonioDay
 from dataclasses import dataclass
 import datetime
 import json
@@ -31,6 +32,7 @@ class Config:
     PROJECTS_URL: str
     LOGIN_URL: str
     COMPANY_HASH: str
+    NON_APPROVABLE: tuple[str]
 
     # Project Mapping (define as an empty tuple if not used)
     # Personio ID from projects/filter[active]=1
@@ -40,6 +42,7 @@ class Config:
 
 def require_config(command: str | None):
     from config import CONFIG as c
+
     try:
         required_names = ["COMPANY_HASH", "LOGIN_URL", "EMAIL", "PASSWORD"]
         if command != "login":
@@ -76,91 +79,6 @@ def login_or_exit(config):
         logger.error("Login failed, no cookies returned.")
         raise SystemExit(1)
     return cookies
-
-
-def get_untrackable_project_ids(resp: requests.Response) -> list[str]:
-    if resp.status_code != 400:
-        return []
-
-    try:
-        resp_dict = resp.json()
-    except requests.exceptions.JSONDecodeError:
-        return []
-
-    untrackable_projects_title_re = re.compile(
-        r"Projects with ids \[([^\]]+)\] for employee \d+ are not trackable"
-    )
-    for error in resp_dict.get("errors", []):
-        if error.get("type") != "ATTENDANCE_PERIOD_PROJECT_NOT_TRACKABLE":
-            continue
-
-        title = error.get("title", "")
-        match = untrackable_projects_title_re.search(title)
-        if not match:
-            return []
-
-        return [project_id.strip() for project_id in match.group(1).split(",") if project_id.strip()]
-
-    return []
-
-
-def remove_untrackable_project_ids(attendance: dict, project_ids: list[str]) -> int:
-    untrackable_ids = set(project_ids)
-    removed = 0
-    for period in attendance["periods"]:
-        if period.get("project_id") in untrackable_ids:
-            period["project_id"] = None
-            removed += 1
-    return removed
-
-
-def log_toggl_day_in_personio(session: requests.Session, config, day, date, cookies) -> bool:
-    attendance = day.to_personio_attendance(config.PROFILE_ID)
-    logger.info(f"Registering entries ({len(attendance['periods'])}) from {date}")
-    token = cookies.get("ATHENA-XSRF-TOKEN", "")
-
-    while True:
-        resp = session.put(
-            f"{config.ATTENDANCE_URL}/{uuid.uuid1()}",
-            json=attendance,
-            headers={
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Encoding": "gzip, deflate, br, zstd",
-                "Referer": "https://efr-gmbh.app.personio.com/",
-                "X-ATHENA-XSRF-TOKEN": token,
-            },
-        )
-        content_type = resp.headers.get("content-type", "")
-        logger.info(f"response: {resp.status_code} {content_type}")
-        logger.trace(f"reponse content:\n {resp.text}")
-
-        untrackable_project_ids = get_untrackable_project_ids(resp)
-        if untrackable_project_ids:
-            removed = remove_untrackable_project_ids(attendance, untrackable_project_ids)
-            if removed:
-                logger.warning(
-                    f"Personio project ids {untrackable_project_ids} are not trackable for {date}; retrying without project mapping"
-                )
-                continue
-
-        if resp.status_code != 200 or "application/json" not in content_type:
-            logger.error(
-                f"Attendance Req:\n"
-                f"Heads: {resp.request.headers}\n"
-                f"Request: {resp.request.body}\n"
-                f"Response: {resp}\n{resp.text}\n"
-            )
-            logger.error(f"FAILED to register attendance for {date}")
-            return False
-
-        resp_dict = json.loads(resp.text)
-        if resp.status_code != 200 or not resp_dict["success"]:
-            logger.error(f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}")
-            logger.info(f"Attendance Resp:\n{resp.text}")
-            logger.error(f"FAILED to register attendance for {date}")
-            return False
-        return True
 
 
 if __name__ == "__main__":
@@ -252,7 +170,9 @@ if __name__ == "__main__":
 
         for date, day in days.items():
             attendance = day.to_personio_attendance(config.PROFILE_ID)
-            is_registered = log_toggl_day_in_personio(session, config, day, date, pers_cookies)
+            is_registered = personio.log_toggl_day_in_personio(
+                session, config, day, date, pers_cookies
+            )
     except Exception as e:
         logger.exception("FAILED", exc_info=e)
         is_registered = False
