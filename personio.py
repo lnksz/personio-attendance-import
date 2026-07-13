@@ -561,9 +561,14 @@ def log_toggl_day_in_personio(
 if __name__ == "__main__":
     from config import CONFIG
 
+    password = os.getenv("PERSO_PASS")
+    if not password:
+        logger.error("No PERSO_PASS set, set -x PERSO_PASS !")
+        raise SystemExit(1)
+
     cookies = login(
         user=CONFIG.EMAIL,
-        password=CONFIG.PASSWORD,
+        password=password,
         url=CONFIG.LOGIN_URL,
         company_hash=CONFIG.COMPANY_HASH,
     )
