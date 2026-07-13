@@ -371,7 +371,16 @@ def approve_zeiterfassung_requests(
                 handled_task_ids.add(task_key)
                 try:
                     card.hover(timeout=5000)
-                    approve_button.click(timeout=5000)
+                    if approve_button.count():
+                        approve_button.click(timeout=5000)
+                    else:
+                        card.locator('[data-test-id="task-open-workspace-overlay"]').click(
+                            timeout=5000
+                        )
+                        approve_button = page.locator(
+                            'button[data-test-id="http.action.key.confirmation"]'
+                        ).filter(has_text="Alle Tage genehmigen").first
+                        approve_button.click(timeout=5000)
                 except TimeoutError:
                     logger.warning(
                         f"Pointer click failed for {name or 'unknown employee'}; trying DOM click"
