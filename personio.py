@@ -1,12 +1,14 @@
-import os
 import json
+import os
 import random
-import time
-import requests
-import uuid
 import re
+import time
+import uuid
+from datetime import date, datetime
+
+import requests
 from loguru import logger
-from playwright.sync_api import sync_playwright, TimeoutError, Page
+from playwright.sync_api import Page, TimeoutError, sync_playwright
 
 
 class PersonioDay:
@@ -25,14 +27,32 @@ class PersonioDay:
         self.periods.append(period)
 
     def to_personio_attendance(self, employee_id: int):
+        attendance_date = date.fromisoformat(self.date)
+        periods = []
+        for period in self.periods:
+            start = datetime.fromisoformat(period["start"])
+            end = datetime.fromisoformat(period["end"]) if period.get("end") else None
+            periods.append(
+                {
+                    "start": start.strftime("%H:%M"),
+                    "end": end.strftime("%H:%M") if end else None,
+                    "start_day_delta": (start.date() - attendance_date).days,
+                    "end_day_delta": (end.date() - attendance_date).days if end else None,
+                    "type": period["period_type"],
+                    "comment": period.get("comment"),
+                    "project_id": period.get("project_id"),
+                }
+            )
         return {
             "employee_id": employee_id,
-            "periods": self.periods,
+            "dates": [self.date],
+            "periods": periods,
         }
 
 
 SESSION_FILE = os.environ.get("PERSONIO_SESSION_FILE", ".personio-session.json")
-REQUIRED_COOKIE_NAMES = {"ATHENA-XSRF-TOKEN"}
+# The XSRF cookie can contain a public .deprecated placeholder, even without auth.
+REQUIRED_COOKIE_NAMES = {"ATHENA_SESSION"}
 
 
 def _cookies_to_map(cookies: list[dict]) -> dict[str, str]:
@@ -513,18 +533,21 @@ def log_toggl_day_in_personio(
     attendance = day.to_personio_attendance(config.PROFILE_ID)
     logger.info(f"Registering entries ({len(attendance['periods'])}) from {date}")
     token = cookies.get("ATHENA-XSRF-TOKEN", "")
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": config.HOST.rstrip("/") + "/",
+    }
+    if token and not token.endswith(".deprecated"):
+        headers["X-ATHENA-XSRF-TOKEN"] = token
 
     while True:
         resp = session.put(
-            f"{config.ATTENDANCE_URL}/{uuid.uuid1()}",
+            config.ATTENDANCE_URL.rstrip("/"),
             json=attendance,
-            headers={
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Encoding": "gzip, deflate, br, zstd",
-                "Referer": "https://efr-gmbh.app.personio.com/",
-                "X-ATHENA-XSRF-TOKEN": token,
-            },
+            headers=headers,
+            timeout=30,
+            allow_redirects=False,
         )
         content_type = resp.headers.get("content-type", "")
         logger.info(f"response: {resp.status_code} {content_type}")
@@ -539,23 +562,25 @@ def log_toggl_day_in_personio(
                 )
                 continue
 
-        if resp.status_code != 200 or "application/json" not in content_type:
-            logger.error(
-                f"Attendance Req:\n"
-                f"Heads: {resp.request.headers}\n"
-                f"Request: {resp.request.body}\n"
-                f"Response: {resp}\n{resp.text}\n"
-            )
-            logger.error(f"FAILED to register attendance for {date}")
-            return False
+        if resp.status_code == 204:
+            return True
+        if 200 <= resp.status_code < 300 and "application/json" in content_type:
+            try:
+                result = resp.json()
+            except requests.exceptions.JSONDecodeError:
+                pass
+            else:
+                if (
+                    isinstance(result, dict)
+                    and result.get("success", True)
+                    and not result.get("errors")
+                ):
+                    return True
 
-        resp_dict = json.loads(resp.text)
-        if resp.status_code != 200 or not resp_dict["success"]:
-            logger.error(f"Attendance Req:\n{resp.request.headers}\n{resp.request.body}")
-            logger.info(f"Attendance Resp:\n{resp.text}")
-            logger.error(f"FAILED to register attendance for {date}")
-            return False
-        return True
+        logger.error(
+            f"FAILED to register attendance for {date}: HTTP {resp.status_code}\n{resp.text}"
+        )
+        return False
 
 
 if __name__ == "__main__":

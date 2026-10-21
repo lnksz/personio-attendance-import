@@ -7,3 +7,4 @@ uv.lock
 # Screenshot exports from playwright
 *.png
 .personio-session.json
+/tmp/

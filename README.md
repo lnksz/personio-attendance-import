@@ -116,7 +116,7 @@ curl -X POST https://api.track.toggl.com/reports/api/v3/workspace/$WID/search/ti
 
 This boils down to
 - Authentication via the login page
-- Sending attendance data with UUIDs and right formatting and tokens
+- Sending attendance dates and time offsets with the authenticated session
 
 ## API Analysis
 
@@ -136,12 +136,16 @@ If the automated login flow is blocked by Vercel Security Checkpoint, use a
 manual bootstrap once and reuse the saved session cookies afterwards.
 
 ```bash
-PERSONIO_MANUAL_LOGIN=true uv run python personio.py
+PERSONIO_MANUAL_LOGIN=true uv run main.py login
 ```
 
 This opens a real browser window. Complete the login manually. Once the script
-detects the `ATHENA-XSRF-TOKEN` cookie, it saves the session to
+detects the `ATHENA_SESSION` cookie, it saves the session to
 `.personio-session.json`.
+
+`ATHENA-XSRF-TOKEN` can now contain a `.deprecated` placeholder. It is no longer
+evidence of a successful login, and the importer does not send this placeholder
+as an XSRF header. Existing sessions with a real XSRF token still send it.
 
 After that, normal runs reuse the saved cookies automatically:
 
@@ -201,7 +205,60 @@ the project id is passed in as a `string`!
 "project_id":"79286"
 ```
 
-### Attendance requests
+### Attendance requests (verified 2026-10-21)
+
+The current Personio frontend uses the batch endpoint, even for a single day:
+
+```http
+PUT /svc/attendance-api/v1/days
+Content-Type: application/json
+Cookie: ATHENA_SESSION=<session>
+```
+
+```json
+{
+    "employee_id": 1234567,
+    "dates": ["2026-10-16"],
+    "periods": [
+        {
+            "start": "08:30",
+            "end": "12:00",
+            "start_day_delta": 0,
+            "end_day_delta": 0,
+            "type": "work",
+            "comment": "[Example project]",
+            "project_id": "123456"
+        }
+    ]
+}
+```
+
+Times use local wall-clock hours and minutes. The importer drops the seconds
+from Toggl timestamps, matching the frontend's `HH:mm` format. Day offsets are
+relative to the attendance date; an overnight period ends with `end_day_delta: 1`.
+Comments and project IDs can be `null`. Client-generated day and period UUIDs
+are no longer part of this save request.
+
+The previous `PUT /svc/attendance-api/v1/days/<uuid>` returns HTTP 501 on the
+current tenant, even with a valid session. Changing the login does not resolve
+that response. The importer uses the collection URL already configured in
+`ATTENDANCE_URL`, without appending a UUID.
+
+The endpoint and payload were checked against the live frontend. Requests with
+no target dates confirmed authentication and schema validation without changing
+attendance records. A full production save was not part of that check.
+The frontend's `createBulkAttendanceDays` operation is defined in the
+[time-money bundle](https://assets.cdn.personio.de/artifact-service/product-area/time-money/1037.37ce462958d599a5b970.js).
+
+Regression tests run locally without contacting Personio:
+
+```bash
+uv run python -m unittest discover -s tests
+```
+
+### Historical attendance API
+
+The captures below document the earlier API and are retained for reference.
 
 Clicking on the calendar, and in the popup modal during adding start, end etc.
 
